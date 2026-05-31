@@ -1,9 +1,9 @@
 <script setup>
-import { RouterView } from 'vue-router'
+import ReceiptScanner from './components/ReceiptScanner.vue';
 </script>
 
 <template>
-  <main class="content-container">
-    <RouterView />
+  <main>
+    <ReceiptScanner></ReceiptScanner>
   </main>
 </template>

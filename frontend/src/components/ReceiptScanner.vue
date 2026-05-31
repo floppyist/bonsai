@@ -1,3 +1,52 @@
+<script setup>
+import { ref } from 'vue';
+
+const isLoading = ref(false);
+const receiptData = ref(null);
+
+const formatPrice = (price) => {
+  if (typeof price !== 'number') return price;
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(price);
+};
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  isLoading.value = true;
+  receiptData.value = null;
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const response = await fetch('http://192.168.188.24:3000/api/upload-receipt', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Serverfehler (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    receiptData.value = data;
+
+  } catch (error) {
+    console.error('Fehler beim Upload:', error);
+    alert(error.message);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const resetScanner = () => {
+  receiptData.value = null;
+};
+</script>
+
+
 <template>
   <div class="scanner-wrapper">
     <h1>Kassenbon Scanner</h1>
@@ -57,63 +106,11 @@
   </div>
 </template>
 
-<script setup>
-import { ref } from 'vue';
-
-const isLoading = ref(false);
-const receiptData = ref(null);
-
-// Preis-Formatierung (z.B. 1.99 -> 1,99 €)
-const formatPrice = (price) => {
-  if (typeof price !== 'number') return price;
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(price);
-};
-
-// Datei-Upload ans Rust-Backend
-const handleFileUpload = async (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  isLoading.value = true;
-  receiptData.value = null;
-
-  const formData = new FormData();
-  formData.append('image', file);
-
-  try {
-    const response = await fetch('http://192.168.188.176:3000/api/upload-receipt', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      // Versucht den exakten Fehlertext aus der main.rs zu lesen (z.B. Python-Fehler)
-      const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Serverfehler (${response.status}): ${errorText}`);
-    }
-
-    const data = await response.json();
-    receiptData.value = data;
-
-  } catch (error) {
-    console.error('Fehler beim Upload:', error);
-    // Zeigt den detaillierten Fehler als Popup auf dem Smartphone an
-    alert(error.message);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const resetScanner = () => {
-  receiptData.value = null;
-};
-</script>
-
 <style scoped>
 .scanner-wrapper {
   max-width: 400px;
   margin: 0 auto;
-  font-family: 'Courier New', Courier, monospace; /* Typischer Kassenbon-Look */
+  font-family: 'Courier New', Courier, monospace;
   padding: 20px;
 }
 
@@ -122,7 +119,6 @@ h1 {
   font-family: sans-serif;
 }
 
-/* Button Styling */
 .camera-button {
   display: block;
   background-color: #4CAF50;
@@ -144,7 +140,6 @@ h1 {
   font-family: sans-serif;
 }
 
-/* Spinner Animation */
 .spinner {
   border: 4px solid #f3f3f3;
   border-top: 4px solid #3498db;
@@ -155,8 +150,8 @@ h1 {
   margin: 20px auto;
 }
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+0% { transform: rotate(0deg); }
+100% { transform: rotate(360deg); }
 }
 
 .loading-section {
@@ -164,7 +159,6 @@ h1 {
   font-family: sans-serif;
 }
 
-/* Receipt Card (Thermopapier-Look) */
 .receipt-card {
   background-color: #fff;
   border: 1px solid #ddd;
