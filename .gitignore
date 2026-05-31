@@ -204,3 +204,4 @@ docs/_book
 test/
 
 backend/debug_images/**
+backend/src/debug_images/**
