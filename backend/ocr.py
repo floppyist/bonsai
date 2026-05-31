@@ -152,6 +152,11 @@ def run_vlm_analysis(b64_image: str):
     print(f"[DEBUG] Sende Daten an Ollama Model '{OLLAMA_MODEL}'...")
     
     prompt = """Extrahiere die Daten dieses deutschen Kassenbons präzise in das vorgegebene JSON-Format.
+
+Achte dabei auf folgende Eigenheiten mancher Bons:
+- NETTO Bons haben die Anzahl der Artikel immer OBERHALB des jeweiligen Artikels
+- REWE Bons haben die Anzahl der Artikel immer UNTERHALB des jeweiligen Artikels
+- LIDL hat folgenden Zeilenaufbau: [Artikelname] [ggf. Stückpreis] x [Anzahl] [Gesamtpreis]
     
 Erwartetes JSON-Schema:
 {
