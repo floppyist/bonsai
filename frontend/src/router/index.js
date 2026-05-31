@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue' // Falls vorhanden
 import ReceiptScanner from '../components/ReceiptScanner.vue' // Deine neue Komponente
 
 const router = createRouter({
@@ -8,18 +7,8 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView
+      component: ReceiptScanner
     },
-    {
-      path: '/scan',
-      name: 'scan',
-      component: ReceiptScanner // Ruft das vorherige Skript auf
-    },
-    {
-      path: '/about',
-      name: 'about',
-      component: () => import('../views/AboutView.vue')
-    }
   ]
 })
 
