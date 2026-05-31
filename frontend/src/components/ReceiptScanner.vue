@@ -23,7 +23,7 @@
 
     <div v-if="receiptData" class="receipt-card">
       <div class="receipt-header">
-        <h2>{{ receiptData.haendler }}</h2>
+        <h2>{{ receiptData.haendler || 'Unbekannter Händler' }}</h2>
       </div>
 
       <div class="receipt-body">
@@ -81,14 +81,15 @@ const handleFileUpload = async (event) => {
   formData.append('image', file);
 
   try {
-    // Ändere die URL auf die IP deines Backend-Servers (z.B. im lokalen Netzwerk)
     const response = await fetch('http://192.168.188.176:3000/api/upload-receipt', {
       method: 'POST',
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error(`Serverfehler: ${response.statusText}`);
+      // Versucht den exakten Fehlertext aus der main.rs zu lesen (z.B. Python-Fehler)
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Serverfehler (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
@@ -96,7 +97,8 @@ const handleFileUpload = async (event) => {
 
   } catch (error) {
     console.error('Fehler beim Upload:', error);
-    alert('Fehler bei der Verarbeitung. Bitte Konsole prüfen.');
+    // Zeigt den detaillierten Fehler als Popup auf dem Smartphone an
+    alert(error.message);
   } finally {
     isLoading.value = false;
   }
@@ -142,7 +144,7 @@ h1 {
   font-family: sans-serif;
 }
 
-/* Spinner */
+/* Spinner Animation */
 .spinner {
   border: 4px solid #f3f3f3;
   border-top: 4px solid #3498db;
@@ -152,7 +154,10 @@ h1 {
   animation: spin 1s linear infinite;
   margin: 20px auto;
 }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 
 .loading-section {
   text-align: center;
