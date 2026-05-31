@@ -7,7 +7,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 export default defineConfig({
   plugins: [
     vue(),
-    basicSsl(),
+    // basicSsl(), // Prevents iOS from using the ICON (this is fixed if a real LetsEncrypt Cert is given later)
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
@@ -15,12 +15,14 @@ export default defineConfig({
         short_name: 'Bonsai',
         description: 'Keep your pantry and purchases perfectly trimmed.',
         theme_color: '#2e7d32',
+        background_color: '#000000',
+        display: 'standalone',
         icons: [
           {
-            src: 'icon.gif',
-            sizes: '470x470',
+            src: 'icon.png',
+            sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
           }
         ]
       }
