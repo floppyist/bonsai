@@ -20,7 +20,7 @@ const handleFileUpload = async (event) => {
   formData.append('image', file);
 
   try {
-    const response = await fetch('http://192.168.188.24:3000/api/upload-receipt', {
+    const response = await fetch('http://192.168.188.176:3000/api/upload-receipt', {
       method: 'POST',
       body: formData,
     });
@@ -47,11 +47,11 @@ const resetScanner = () => {
 </script>
 
 <template>
-  <div class="scanner-wrapper flex flex-col h-screen bg-sky-950 justify-center items-center">
+  <div class="scanner-wrapper flex flex-col h-screen justify-center items-center">
     <h1 class="text-4xl text-sky-100 font-bold">Receipt Scanner</h1>
 
     <div v-if="!isLoading && !receiptData" class="upload-section w-full flex justify-center flex-col">
-      <label class="bg-sky-700 hover:bg-blue-800 text-white font-bold m-5 rounded text-center p-3">
+      <label class="bg-sky-700 hover:bg-sky-500 text-white font-bold m-5 rounded text-center p-3">
         Foto aufnehmen / hochladen
         <input
           type="file"
@@ -66,7 +66,7 @@ const resetScanner = () => {
 
     <div v-if="isLoading" class="loading-section">
       <div class="spinner"></div>
-      <p>Bild wird analysiert... (Das kann auf der CPU dauern ☕)</p>
+      <p class="text-white">Bild wird analysiert...</p>
     </div>
 
     <div v-if="receiptData" class="receipt-card">
