@@ -46,14 +46,13 @@ const resetScanner = () => {
 };
 </script>
 
-
 <template>
-  <div class="scanner-wrapper">
-    <h1>Kassenbon Scanner</h1>
+  <div class="scanner-wrapper flex flex-col h-screen bg-sky-950 justify-center items-center">
+    <h1 class="text-4xl text-sky-100 font-bold">Receipt Scanner</h1>
 
-    <div v-if="!isLoading && !receiptData" class="upload-section">
-      <label class="camera-button">
-        📸 Foto aufnehmen / hochladen
+    <div v-if="!isLoading && !receiptData" class="upload-section w-full flex justify-center flex-col">
+      <label class="bg-sky-700 hover:bg-blue-800 text-white font-bold m-5 rounded text-center p-3">
+        Foto aufnehmen / hochladen
         <input
           type="file"
           accept="image/*"
@@ -114,29 +113,10 @@ const resetScanner = () => {
   padding: 20px;
 }
 
-h1 {
-  text-align: center;
-  font-family: sans-serif;
-}
-
-.camera-button {
-  display: block;
-  background-color: #4CAF50;
-  color: white;
-  padding: 15px 20px;
-  text-align: center;
-  border-radius: 8px;
-  font-weight: bold;
-  font-family: sans-serif;
-  cursor: pointer;
-  margin-top: 20px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
 .hint {
   text-align: center;
-  font-size: 0.8em;
-  color: #666;
+  font-size: 0.6em;
+  color: #999;
   font-family: sans-serif;
 }
 
