@@ -1,4 +1,6 @@
-use log::debug;
+mod preprocessing;
+mod vlm;
+
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -7,11 +9,9 @@ use anyhow::Context;
 use anyhow::Result;
 
 use opencv::imgcodecs;
+use log::debug;
 
 use crate::config::BonsaiOptions;
-
-pub mod preprocessing;
-pub mod vlm;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Article {

@@ -1,4 +1,4 @@
 pub enum DBStatus {
-    DatabaseExists,
     DatabaseCreated,
+    DatabaseConnected,
 }

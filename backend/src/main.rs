@@ -15,8 +15,9 @@ use axum::response::IntoResponse;
 use axum::response::Json;
 
 use log::debug;
-
 use log::error;
+use log::warn;
+
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
@@ -35,7 +36,7 @@ async fn main() {
     let shared_state = Arc::new(options);
 
     if establish_database_connection(&shared_state.clone()).await.is_err() {
-        error!("No database is used!");
+        warn!("No database is used!");
     }
 
     let cors = CorsLayer::new()
