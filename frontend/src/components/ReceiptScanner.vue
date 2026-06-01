@@ -6,11 +6,13 @@ const receiptData = ref(null);
 
 const formatPrice = (price) => {
   if (typeof price !== 'number') return price;
+
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(price);
 };
 
 const handleFileUpload = async (event) => {
   const file = event.target.files[0];
+
   if (!file) return;
 
   isLoading.value = true;
@@ -27,14 +29,15 @@ const handleFileUpload = async (event) => {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Serverfehler (${response.status}): ${errorText}`);
+
+      throw new Error(`Server error (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
-    receiptData.value = data;
 
+    receiptData.value = data;
   } catch (error) {
-    console.error('Fehler beim Upload:', error);
+    console.error('Error while uploading: ', error);
 
     alert(error.message);
   } finally {
@@ -53,7 +56,7 @@ const resetScanner = () => {
 
     <div v-if="!isLoading && !receiptData" class="upload-section w-full flex justify-center flex-col">
       <label class="bg-sky-700 hover:bg-sky-500 text-white font-bold m-5 rounded text-center p-3">
-        Foto aufnehmen / hochladen
+        Capture photo / Upload
         <input
           type="file"
           accept="image/*"
@@ -62,33 +65,33 @@ const resetScanner = () => {
           style="display: none;"
         />
       </label>
-      <p class="hint">Die Verarbeitung durch KI kann einen Moment dauern.</p>
     </div>
 
     <div v-if="isLoading" class="loading-section">
       <div class="spinner"></div>
-      <p class="text-white">Bild wird analysiert...</p>
+      <p class="text-white">Image is being analyzed...</p>
     </div>
 
     <div v-if="receiptData" class="receipt-card">
       <div class="receipt-header">
-        <h2>{{ receiptData.haendler || 'Unbekannter Händler' }}</h2>
+        <h2>{{ receiptData.retailer || 'Unbekannter Händler' }}</h2>
+        <h3>{{ receiptData.date }}</h3>
       </div>
 
       <div class="receipt-body">
         <table>
           <thead>
             <tr>
-              <th>Menge</th>
-              <th>Artikel</th>
-              <th class="text-right">Preis</th>
+              <th>Quantity</th>
+              <th>Article</th>
+              <th class="text-right">Price</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, index) in receiptData.artikel" :key="index">
-              <td>{{ item.menge }}x</td>
+            <tr v-for="(item, index) in receiptData.articles" :key="index">
+              <td>{{ item.quantity }}x</td>
               <td>{{ item.name }}</td>
-              <td class="text-right">{{ formatPrice(item.preis_gesamt) }}</td>
+              <td class="text-right">{{ formatPrice(item.price_total) }}</td>
             </tr>
           </tbody>
         </table>
@@ -96,12 +99,12 @@ const resetScanner = () => {
 
       <div class="receipt-footer">
         <div class="total-row">
-          <span>GESAMTBETRAG</span>
-          <span>{{ formatPrice(receiptData.gesamtbetrag) }}</span>
+          <span>TOTAL AMOUNT</span>
+          <span>{{ formatPrice(receiptData.total_amount) }}</span>
         </div>
       </div>
 
-      <button @click="resetScanner" class="reset-button">Neuen Bon scannen</button>
+      <button @click="resetScanner" class="reset-button">Scan new receipt</button>
     </div>
   </div>
 </template>

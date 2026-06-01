@@ -1,3 +1,5 @@
+use log::debug;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -11,23 +13,17 @@ pub mod vlm;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Article {
-    #[serde(rename = "name", alias = "name")]
     pub name: String,
-    #[serde(rename = "menge", alias = "quantity")]
     pub quantity: i32,
-    #[serde(rename = "preis_einzel", alias = "price_unit")]
     pub price_unit: f64,
-    #[serde(rename = "preis_gesamt", alias = "price_total")]
     pub price_total: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Receipt {
-    #[serde(rename = "haendler", alias = "retailer")]
     pub retailer: String,
-    #[serde(rename = "artikel", alias = "articles")]
+    pub date: String,
     pub articles: Vec<Article>,
-    #[serde(rename = "gesamtbetrag", alias = "total_amount")]
     pub total_amount: f64,
 }
 
@@ -75,6 +71,8 @@ pub async fn run_ocr_pipeline(image_bytes: &[u8]) -> Result<Receipt> {
 
     let receipt: Receipt = serde_json::from_str(&vlm_json_output)
         .context(format!("Failed to parse VLM JSON output: {}", vlm_json_output))?;
+
+    debug!("Output: {:?}", receipt);
 
     Ok(receipt)
 }

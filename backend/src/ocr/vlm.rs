@@ -21,6 +21,7 @@ pub async fn run_vlm_analysis(b64_image: &str) -> Result<String> {
                   Expected JSON schema:\n\
                   {\n\
                     \"retailer\": \"Name of the store\",\n\
+                    \"date\": \"Date of the receipt\",\n\
                     \"articles\": [\n\
                       {\"name\": \"Cleaned item name\", \"quantity\": 1, \"price_unit\": 0.00, \"price_total\": 0.00}\n\
                     ],\n\
