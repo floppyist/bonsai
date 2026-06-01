@@ -1,4 +1,4 @@
-<h1><img src="frontend/public/icon.gif" alt="Bonsai Logo" width="45" align="middle">&nbsp;<strong>bonsai</strong></h1>
+<h1><img src="frontend/public/icon.gif" alt="Bonsai Logo" width="45" style="vertical-align: middle;">&nbsp;<strong>bonsai</strong></h1>
 
 > Keep your pantry and purchases perfectly trimmed.
 
