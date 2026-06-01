@@ -5,17 +5,17 @@
 </p>
 </div>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Axum-orange?style=for-the-badge&logo=rust&logoColor=white" alt="Axum">
+  <img src="https://img.shields.io/badge/Tokio-red?style=for-the-badge&logo=tokio&logoColor=white" alt="Tokio">
+  <img src="https://img.shields.io/badge/vuejs-%234FC08D.svg?style=for-the-badge&logo=vuedotjs&logoColor=white" alt="Vue.js">
+  <img src="https://img.shields.io/badge/opencv-%235C3EE8.svg?style=for-the-badge&logo=opencv&logoColor=white" alt="OpenCV">
+  <img src="https://img.shields.io/badge/Ollama-black?style=for-the-badge&logo=ollama&logoColor=white" alt="Ollama">
+</p>
+
 ---
 
 Bonsai is a smart Progressive Web App (PWA) designed to automate your grocery tracking and budgeting. By simply scanning your receipts and EAN barcodes, the app automatically populates your digital pantry—complete with real-time stock levels and nutritional insights—while seamlessly managing your household expense log in the background.
-
----
-
-![Axum](https://img.shields.io/badge/Axum-orange?style=for-the-badge&logo=rust&logoColor=white)
-![Tokio](https://img.shields.io/badge/Tokio-red?style=for-the-badge&logo=tokio&logoColor=white)
-![Vue.js](https://img.shields.io/badge/vuejs-%234FC08D.svg?style=for-the-badge&logo=vuedotjs&logoColor=white)
-![OpenCV](https://img.shields.io/badge/opencv-%235C3EE8.svg?style=for-the-badge&logo=opencv&logoColor=white)
-![Ollama](https://img.shields.io/badge/Ollama-black?style=for-the-badge&logo=ollama&logoColor=white)
 
 ---
 
@@ -38,7 +38,7 @@ Install the core compilers, runtimes, and C++ bindings required for the image pr
 sudo xbps-install -y cargo llvm libclang libopencv-devel nodejs
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > Void Linux holds multiple versions of `libclang`, but our Rust bindings explicitly look for `libclang.so`. You need to create a proper symlink.
 
 1. **Identify your installed version:**
