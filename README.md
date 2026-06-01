@@ -1,4 +1,9 @@
-<h1><img src="frontend/public/icon.gif" alt="Bonsai Logo" width="45" style="vertical-align: middle;">&nbsp;<strong>bonsai</strong></h1>
+<table>
+  <tr>
+    <td><img src="frontend/public/icon.gif" alt="Logo" width="45"></td>
+    <td><h1><strong>bonsai</strong></h1></td>
+  </tr>
+</table>
 
 > Keep your pantry and purchases perfectly trimmed.
 
