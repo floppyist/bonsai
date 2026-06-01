@@ -1,6 +1,7 @@
 mod error;
 mod status;
 
+use log::debug;
 use log::info;
 use log::error;
 
@@ -8,6 +9,7 @@ use sqlx::Sqlite;
 use sqlx::migrate;
 use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::SqlitePoolOptions;
+
 use crate::config::BonsaiOptions;
 use crate::db::error::DBError;
 use crate::db::status::DBStatus;
@@ -29,7 +31,7 @@ pub async fn establish_database_connection(options: &BonsaiOptions) -> Result<DB
             }
         }
     } else {
-        info!("Database '{}' already exists", db_url);
+        debug!("Database '{}' already exists", db_url);
     }
 
     let pool = SqlitePoolOptions::new()
@@ -37,12 +39,14 @@ pub async fn establish_database_connection(options: &BonsaiOptions) -> Result<DB
         .connect(db_url)
         .await.unwrap();
 
-    info!("Process DB migration...");
+    debug!("Process DB migration...");
 
     if let Err(e) = migrate!("./migrations").run(&pool).await {
         error!("Migration failed: '{}'", e);
         return Err(DBError::MigrationFailed);
     }
+
+    info!("Connected to database: '{}'", db_url);
 
     Ok(DBStatus::DatabaseConnected)
 }

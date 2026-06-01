@@ -14,8 +14,8 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Json;
 
-use log::debug;
 use log::error;
+use log::info;
 use log::warn;
 
 use tower_http::cors::Any;
@@ -52,7 +52,7 @@ async fn main() {
 
     match tokio::net::TcpListener::bind("0.0.0.0:3000").await {
         Ok(listener) => {
-            debug!("Socket binding successfull.");
+            info!("bonsai backend runs on '0.0.0.0:3000'");
 
             match axum::serve(listener, app).await {
                 Ok(_) => {},
@@ -70,16 +70,13 @@ async fn main() {
 }
 
 async fn upload_receipt(
-    State(config): State<Arc<BonsaiOptions>>, 
-    body_bytes: axum::body::Bytes
+    State(config): State<Arc<BonsaiOptions>>, body_bytes: axum::body::Bytes
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    debug!("Starting OCR pipeline...");
-
-    // Config als Referenz in die Pipeline reichen
     match ocr::run_ocr_pipeline(&body_bytes, &config).await {
         Ok(receipt) => Ok(Json(receipt)),
         Err(err) => {
             error!("Pipeline failed: {:?}", err);
+
             Err((StatusCode::INTERNAL_SERVER_ERROR, format!("OCR Pipeline error: {}", err)))
         }
     }

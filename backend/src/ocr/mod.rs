@@ -1,15 +1,16 @@
 mod preprocessing;
 mod vlm;
 
-
 use serde::Deserialize;
 use serde::Serialize;
 
 use anyhow::Context;
 use anyhow::Result;
 
-use opencv::imgcodecs;
 use log::debug;
+use log::info;
+
+use opencv::imgcodecs;
 
 use crate::config::BonsaiOptions;
 
@@ -64,6 +65,8 @@ struct ResponseMessage {
 }
 
 pub async fn run_ocr_pipeline(image_bytes: &[u8], config: &BonsaiOptions) -> Result<Receipt> {
+    info!("Starting OCR pipeline...");
+
     let vec_bytes = opencv::core::Vector::<u8>::from_iter(image_bytes.to_vec());
     let img_bgr = imgcodecs::imdecode(&vec_bytes, imgcodecs::IMREAD_COLOR)
         .context("Failed to decode image bytes into OpenCV Mat")?;
@@ -75,6 +78,7 @@ pub async fn run_ocr_pipeline(image_bytes: &[u8], config: &BonsaiOptions) -> Res
         .context(format!("Failed to parse VLM JSON output: {}", vlm_json_output))?;
 
     debug!("Output: {:?}", receipt);
+    info!("OCR finished");
 
     Ok(receipt)
 }
