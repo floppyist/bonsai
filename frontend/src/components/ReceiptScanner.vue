@@ -16,13 +16,13 @@ const handleFileUpload = async (event) => {
   isLoading.value = true;
   receiptData.value = null;
 
-  const formData = new FormData();
-  formData.append('image', file);
-
   try {
     const response = await fetch('http://192.168.188.176:3000/api/upload-receipt', {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': file.type,
+      },
+      body: file,
     });
 
     if (!response.ok) {
@@ -35,6 +35,7 @@ const handleFileUpload = async (event) => {
 
   } catch (error) {
     console.error('Fehler beim Upload:', error);
+
     alert(error.message);
   } finally {
     isLoading.value = false;
