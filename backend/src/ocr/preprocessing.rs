@@ -19,7 +19,7 @@ use anyhow::Result;
 use base64::Engine;
 use log::debug;
 
-const DEBUG_DIR: &str = "target/debug_output";
+use crate::config::BonsaiOptions;
 
 pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
     debug!("Starting image optimization pipeline...");
@@ -299,7 +299,7 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
     Ok(img_np.clone())
 }
 
-pub fn process_image_pipeline_from_mat(img_bgr: &Mat) -> Result<String> {
+pub fn process_image_pipeline_from_mat(img_bgr: &Mat, config: &BonsaiOptions) -> Result<String> {
     debug!("Executing image preprocessing pipeline...");
     debug!("Converting input image from BGR to RGB color space... (1/6)");
 
@@ -349,9 +349,11 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat) -> Result<String> {
 
     debug!("Creating debug directory and converting matrix back to BGR... (3/6)");
 
-    fs::create_dir_all(DEBUG_DIR)?;
+    let debug_dir = &config.preprocessing.debug_dir;
 
-    let debug_out_path = format!("{}/prep_output.jpg", DEBUG_DIR);
+    fs::create_dir_all(debug_dir)?;
+
+    let debug_out_path = format!("{}/prep_output.jpg", debug_dir);
     let mut final_bgr = Mat::default();
 
     imgproc::cvt_color(

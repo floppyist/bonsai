@@ -8,6 +8,8 @@ use anyhow::Result;
 
 use opencv::imgcodecs;
 
+use crate::config::BonsaiOptions;
+
 pub mod preprocessing;
 pub mod vlm;
 
@@ -61,13 +63,13 @@ struct ResponseMessage {
     content: String,
 }
 
-pub async fn run_ocr_pipeline(image_bytes: &[u8]) -> Result<Receipt> {
+pub async fn run_ocr_pipeline(image_bytes: &[u8], config: &BonsaiOptions) -> Result<Receipt> {
     let vec_bytes = opencv::core::Vector::<u8>::from_iter(image_bytes.to_vec());
     let img_bgr = imgcodecs::imdecode(&vec_bytes, imgcodecs::IMREAD_COLOR)
         .context("Failed to decode image bytes into OpenCV Mat")?;
 
-    let b64_image = preprocessing::process_image_pipeline_from_mat(&img_bgr)?;
-    let vlm_json_output = vlm::run_vlm_analysis(&b64_image).await?;
+    let b64_image = preprocessing::process_image_pipeline_from_mat(&img_bgr, config)?;
+    let vlm_json_output = vlm::run_vlm_analysis(&b64_image, config).await?;
 
     let receipt: Receipt = serde_json::from_str(&vlm_json_output)
         .context(format!("Failed to parse VLM JSON output: {}", vlm_json_output))?;

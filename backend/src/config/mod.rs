@@ -17,13 +17,13 @@ pub struct GeneralOptions {
 
 #[derive(Deserialize, Serialize)]
 pub struct PreprocessingOptions {
-    debug_dir: String,
+    pub debug_dir: String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct LVMOptions {
-    ollama_model: String,
-    ollama_url: String,
+    pub ollama_model: String,
+    pub ollama_url: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -38,7 +38,6 @@ impl Default for BonsaiOptions {
     fn default() -> Self {
         Self {
             general: GeneralOptions {
-
             },
             preprocessing: PreprocessingOptions {
                 debug_dir: "target/debug_output".to_string(),
