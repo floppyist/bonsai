@@ -1,5 +1,6 @@
 use anyhow::Result;
 use anyhow::Context;
+use log::debug;
 
 use crate::ocr::OllamaMessage;
 use crate::ocr::OllamaOptions;
@@ -10,7 +11,7 @@ const OLLAMA_MODEL: &str = "qwen2.5vl:3b";
 const OLLAMA_URL: &str = "http://localhost:11434/api/chat";
 
 pub async fn run_vlm_analysis(b64_image: &str) -> Result<String> {
-    println!("[DEBUG] Forwarding request to Ollama model '{}'...", OLLAMA_MODEL);
+    debug!("Forwarding request to Ollama model: '{}'...", OLLAMA_MODEL);
 
     let prompt = "Extract data from this German receipt precisely into the requested JSON format.\n\n\
                   Take note of these store-specific patterns if present:\n\

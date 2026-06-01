@@ -2,6 +2,8 @@ pub mod config;
 pub mod logger;
 pub mod ocr;
 
+use std::process::exit;
+
 use axum::Router;
 use axum::routing::post;
 use axum::extract::DefaultBodyLimit;
@@ -11,6 +13,7 @@ use axum::response::Json;
 
 use log::debug;
 
+use log::error;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
@@ -19,7 +22,7 @@ use crate::logger::setup_logging;
 
 #[tokio::main]
 async fn main() {
-    let mut options = BonsaiOptions::load();
+    let options = BonsaiOptions::load();
 
     if let Err(e) = setup_logging(&options) {
         eprintln!("Error while initializing logger: {}", e);
@@ -35,20 +38,33 @@ async fn main() {
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024));
 
-    debug!("Backend running on http://0.0.0.0:3000");
+    match tokio::net::TcpListener::bind("0.0.0.0:3000").await {
+        Ok(listener) => {
+            debug!("Socket binding successfull.");
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-
-    axum::serve(listener, app).await.unwrap();
+            match axum::serve(listener, app).await {
+                Ok(_) => {},
+                Err(e) => {
+                    error!("Error serving backend: {}", e);
+                    exit(1);
+                }
+            }
+        },
+        Err(e) => {
+            error!("Error binding tcp listener: {}", e);
+            exit(1);
+        }
+    }
 }
 
 async fn upload_receipt(body_bytes: axum::body::Bytes) -> Result<impl IntoResponse, (StatusCode, String)> {
-    println!("Starting native Rust OCR pipeline...");
+    debug!("Starting OCR pipeline...");
 
     match ocr::run_ocr_pipeline(&body_bytes).await {
         Ok(receipt) => Ok(Json(receipt)),
         Err(err) => {
-            eprintln!("[ERROR] Pipeline failed: {:?}", err);
+            error!("Pipeline failed: {:?}", err);
+
             Err((StatusCode::INTERNAL_SERVER_ERROR, format!("OCR Pipeline error: {}", err)))
         }
     }

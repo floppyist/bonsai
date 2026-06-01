@@ -17,12 +17,14 @@ use opencv::core::Vector;
 
 use anyhow::Result;
 use base64::Engine;
+use log::debug;
 
 const DEBUG_DIR: &str = "target/debug_output";
 
 pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
-    println!("[DEBUG] Starting text optimization...");
-
+    debug!("Starting image optimization pipeline...");
+    debug!("Converting input image to grayscale... (1/8)");
+    
     let mut gray = Mat::default();
 
     imgproc::cvt_color(
@@ -32,6 +34,8 @@ pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
         0,
         AlgorithmHint::ALGO_HINT_APPROX,
     )?;
+
+    debug!("Estimating background illumination via morphology dilation... (2/8)");
 
     let kernel = imgproc::get_structuring_element(
         imgproc::MORPH_RECT,
@@ -52,6 +56,8 @@ pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
         imgproc::morphology_default_border_value()?,
     )?;
 
+    debug!("Smoothing background estimation with Gaussian blur... (3/8)");
+
     let mut background_blur = Mat::default();
 
     imgproc::gaussian_blur(
@@ -64,6 +70,8 @@ pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
         AlgorithmHint::ALGO_HINT_APPROX,
     )?;
 
+    debug!("Performing flat-field division to remove shadows... (4/8)");
+
     let mut normalized = Mat::default();
 
     opencv::core::divide2(
@@ -74,9 +82,13 @@ pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
         -1,
     )?;
 
+    debug!("Applying bilateral filter to reduce paper grain and noise... (5/8)");
+
     let mut denoised = Mat::default();
 
     imgproc::bilateral_filter(&normalized, &mut denoised, 7, 50.0, 50.0, BORDER_DEFAULT)?;
+
+    debug!("Generating binary threshold mask to isolate bleed-through / ghosting... (6/8)");
 
     const WHITE_THRESHOLD: f64 = 200.0;
     let mut ghosting_mask = Mat::default();
@@ -89,16 +101,18 @@ pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
         imgproc::THRESH_BINARY,
     )?;
 
+    debug!("Merging ghosting mask to eliminate background bleed-through... (7/8)");
+
     let mut filtered = Mat::default();
 
     opencv::core::bitwise_or(&denoised, &ghosting_mask, &mut filtered, &no_array())?;
+
+    debug!("Enhancing local contrast using CLAHE and converting back to RGB... (8/8)");
 
     let mut clahe = imgproc::create_clahe(1.5, Size::new(8, 8))?;
     let mut enhanced = Mat::default();
 
     clahe.apply(&filtered, &mut enhanced)?;
-
-    println!("[DEBUG] Ghosting filter applied with threshold {}", WHITE_THRESHOLD);
 
     let mut result = Mat::default();
 
@@ -110,11 +124,14 @@ pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
         AlgorithmHint::ALGO_HINT_APPROX,
     )?;
 
+    debug!("Image optimization successfully completed!");
+
     Ok(result)
 }
 
 pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
-    println!("[DEBUG] Analyzing image contours for auto-crop...");
+    debug!("Starting receipt auto-crop pipeline...");
+    debug!("Calculating scale factors and resizing for contour analysis... (1/6)");
 
     let size = img_np.size()?;
     let h = size.height;
@@ -131,6 +148,8 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
         imgproc::INTER_AREA,
     )?;
 
+    debug!("Converting downscaled image to grayscale... (2/6)");
+
     let mut gray = Mat::default();
 
     imgproc::cvt_color(
@@ -140,6 +159,8 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
         0,
         AlgorithmHint::ALGO_HINT_APPROX,
     )?;
+
+    debug!("Applying Gaussian blur to suppress noise before thresholding... (3/6)");
 
     let mut blurred = Mat::default();
 
@@ -153,6 +174,8 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
         AlgorithmHint::ALGO_HINT_APPROX,
     )?;
 
+    debug!("Executing Otsu's adaptive thresholding for binarization... (4/6)");
+
     let mut thresh = Mat::default();
 
     imgproc::threshold(
@@ -162,6 +185,8 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
         255.0,
         imgproc::THRESH_BINARY | imgproc::THRESH_OTSU,
     )?;
+
+    debug!("Finding external contours on the binary image... (5/6)");
 
     let mut contours = Vector::<Vector<Point>>::new();
 
@@ -190,7 +215,7 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
         let small_size = small.size()?;
 
         if max_area > (small_size.width * small_size.height) as f64 * 0.08 {
-            println!("[DEBUG] Valid contour found with area {:.0}px. Processing crop...", max_area);
+            debug!("Valid receipt contour found. Performing perspective warp... (6/6)");
 
             let mut max_cnt_f32 = Vector::<Point2f>::new();
 
@@ -263,15 +288,21 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
                 Scalar::default(),
             )?;
 
+            debug!("Receipt auto-crop successfully completed!");
+
             return Ok(warped);
         }
     }
 
-    println!("[DEBUG] No distinct receipt contour detected. Falling back to original image dimensions.");
+    debug!("No distinct receipt contour detected. Skipping crop step... (6/6)");
+
     Ok(img_np.clone())
 }
 
 pub fn process_image_pipeline_from_mat(img_bgr: &Mat) -> Result<String> {
+    debug!("Executing image preprocessing pipeline...");
+    debug!("Converting input image from BGR to RGB color space... (1/6)");
+
     let mut img_rgb = Mat::default();
 
     imgproc::cvt_color(
@@ -284,6 +315,9 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat) -> Result<String> {
 
     let cropped_rgb = crop_to_receipt(&img_rgb)?;
     let enhanced_rgb = maximize_text_quality(&cropped_rgb)?;
+
+    debug!("Checking image dimensions for dynamic VLM downscaling... (2/6)");
+
     let cur_size = enhanced_rgb.size()?;
     let max_side = 680;
     let mut final_rgb = enhanced_rgb;
@@ -308,8 +342,12 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat) -> Result<String> {
 
         let new_size = final_rgb.size()?;
 
-        println!("[DEBUG] Image scaled down to {}x{}", new_size.width, new_size.height);
+        debug!("Image successfully scaled down to {}x{} (2/6)", new_size.width, new_size.height);
+    } else {
+        debug!("Image size within limits, skipping downscale step (2/6)");
     }
+
+    debug!("Creating debug directory and converting matrix back to BGR... (3/6)");
 
     fs::create_dir_all(DEBUG_DIR)?;
 
@@ -324,13 +362,17 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat) -> Result<String> {
         AlgorithmHint::ALGO_HINT_APPROX,
     )?;
 
+    debug!("Writing preprocessed visualization matrix to disk... (4/6)");
+
     imgcodecs::imwrite(
         &debug_out_path,
         &final_bgr,
         &Vector::new()
     )?;
 
-    println!("[DEBUG] Preprocessed debug image saved to {}", debug_out_path);
+    debug!("Preprocessed debug image saved to {} (4/6)", debug_out_path);
+
+    debug!("Encoding optimized matrix to high-quality JPEG binary buffer... (5/6)");
 
     let mut buffer = Vector::<u8>::new();
     let mut params = Vector::<i32>::new();
@@ -345,7 +387,11 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat) -> Result<String> {
         &params
     )?;
 
+    debug!("Converting binary JPEG stream to Base64 string... (6/6)");
+
     let b64_encoded = base64::engine::general_purpose::STANDARD.encode(buffer.to_vec());
+
+    debug!("Image preprocessing pipeline successfully finished!");
 
     Ok(b64_encoded)
 }
