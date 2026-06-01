@@ -1,6 +1,7 @@
-pub mod config;
-pub mod logger;
-pub mod ocr;
+mod config;
+mod logger;
+mod ocr;
+mod db;
 
 use std::process::exit;
 use std::sync::Arc;
@@ -20,6 +21,7 @@ use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
 use crate::config::BonsaiOptions;
+use crate::db::establish_database_connection;
 use crate::logger::setup_logging;
 
 #[tokio::main]
@@ -31,6 +33,10 @@ async fn main() {
     }
 
     let shared_state = Arc::new(options);
+
+    if establish_database_connection(&shared_state.clone()).await.is_err() {
+        error!("No database is used!");
+    }
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

@@ -9,6 +9,7 @@ pub struct BonsaiOptions {
     pub preprocessing: PreprocessingOptions,
     pub lvm: LVMOptions,
     pub logging: LoggingOptions,
+    pub database: DatabaseOptions,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -34,6 +35,11 @@ pub struct LoggingOptions {
     pub level: String,
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct DatabaseOptions {
+    pub url: String,
+}
+
 impl Default for BonsaiOptions {
     fn default() -> Self {
         Self {
@@ -51,8 +57,10 @@ impl Default for BonsaiOptions {
                 file: false,
                 path: "".to_string(),
                 level: "error".to_string(),
+            },
+            database: DatabaseOptions {
+                url: "sqlite://sqlite.db".to_string(),
             }
-
         }
     }
 }
