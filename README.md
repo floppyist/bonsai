@@ -1,4 +1,4 @@
-markdown_content_v4 = """# <img src="frontend/public/logo.png" alt="Bonsai Logo" width="45" align="middle"> bonsai
+# <img src="frontend/public/logo.png" alt="Logo" width="45" align="middle"> bonsai
 
 > Keep your pantry and purchases perfectly trimmed.
 
