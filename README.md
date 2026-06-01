@@ -1,7 +1,8 @@
-<div style="display: flex; align-items: center; gap: 10px;">
-  <img src="frontend/public/icon.gif" alt="Bonsai Logo" width="45" height="45">
-  <span style="font-size: 2em; font-weight: bold;">bonsai</span>
-</div>
+<p align="center">
+  <img src="frontend/public/icon.gif" alt="Bonsai Logo" width="80">
+</p>
+
+# bonsai
 
 > Keep your pantry and purchases perfectly trimmed.
 
