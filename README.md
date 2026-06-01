@@ -1,8 +1,7 @@
-<p align="center">
+<div align="center">
   <img src="frontend/public/icon.gif" alt="Bonsai Logo" width="80">
-</p>
-
-# bonsai
+  <h1>Bonsai</h1>
+</div>
 
 > Keep your pantry and purchases perfectly trimmed.
 
