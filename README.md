@@ -1,7 +1,7 @@
-<table>
-  <tr>
-    <td><img src="frontend/public/icon.gif" alt="Logo" width="45"></td>
-    <td><h1><strong>bonsai</strong></h1></td>
+<table border="0" cellpadding="0" cellspacing="0" style="border: none; border-collapse: collapse;">
+  <tr style="border: none;">
+    <td style="border: none; padding-right: 10px;"><img src="frontend/public/icon.gif" alt="Bonsai Logo" width="45"></td>
+    <td style="border: none; padding: 0;"><h1 style="border: none; margin: 0; padding: 0;"><strong>bonsai</strong></h1></td>
   </tr>
 </table>
 
