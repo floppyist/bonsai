@@ -44,9 +44,9 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
             },
         ],
         options: OllamaOptions {
-            temperature: 0.0,
-            top_p: 0.1,
-            num_thread: 8,
+            temperature: config.lvm.temperature,
+            top_p: config.lvm.top_p,
+            num_thread: config.lvm.num_thread,
         },
         format: "json".to_string(),
         stream: false,

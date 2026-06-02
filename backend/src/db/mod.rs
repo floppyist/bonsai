@@ -35,7 +35,7 @@ pub async fn establish_database_connection(options: &BonsaiOptions) -> Result<DB
     }
 
     let pool = SqlitePoolOptions::new()
-        .max_connections(5)
+        .max_connections(options.database.max_pool_connections)
         .connect(db_url)
         .await.unwrap();
 
