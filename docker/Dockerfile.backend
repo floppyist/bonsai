@@ -1,0 +1,40 @@
+FROM voidlinux/voidlinux:latest
+
+RUN mkdir -p /etc/xbps.d && \
+    echo "repository=http://repo-default.voidlinux.org/current" > /etc/xbps.d/00-repository-main.conf
+
+RUN xbps-install -Syu xbps && xbps-install -Syu && xbps-install -y \
+    git \
+    curl \
+    cargo \
+    llvm \
+    clang \
+    libclang \
+    libopencv-devel \
+    pkg-config \
+    cmake \
+    make \
+    gcc \
+    zstd \
+    libzstd \
+    libzstd-devel \
+    && rm -rf /var/cache/xbps/*
+
+RUN LN_TARGET=$(ls /usr/lib/libclang.so.* | head -n 1) && ln -s $LN_TARGET /usr/lib/libclang.so
+
+RUN git clone --branch feature/database http://git.pi/floppyist/bonsai /app
+
+WORKDIR /app/backend
+RUN cargo build --release
+
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+RUN ollama serve & \
+    sleep 5 && \
+    ollama pull qwen2.5vl:3b
+
+RUN printf '#!/bin/sh\nollama serve &\nsleep 3\nexec cargo run --release\n' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["/entrypoint.sh"]
