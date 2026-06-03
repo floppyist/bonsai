@@ -9,7 +9,7 @@ RUN xbps-install -Syu xbps && xbps-install -Syu && xbps-install -y \
     nodejs \
     && rm -rf /var/cache/xbps/*
 
-RUN git clone --branch feature/database https://github.com/floppyist/bonsai /app
+RUN git clone --branch feature/database http://git.pi/floppyist/bonsai /app
 
 WORKDIR /app/frontend
 RUN npm install
