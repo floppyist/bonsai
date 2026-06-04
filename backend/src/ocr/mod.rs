@@ -2,6 +2,7 @@ mod preprocessing;
 mod vlm;
 
 use serde::Deserialize;
+use serde::Deserializer;
 use serde::Serialize;
 
 use anyhow::Context;
@@ -14,20 +15,78 @@ use opencv::imgcodecs;
 
 use crate::config::BonsaiOptions;
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Confidence {
+    High,
+    Medium,
+    Low,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Field<T> {
+    pub value: T,
+    pub confidence: Confidence,
+}
+
+fn deserialize_flexible_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrFloat {
+        Float(f64),
+        String(String),
+    }
+
+    match StringOrFloat::deserialize(deserializer)? {
+        StringOrFloat::Float(f) => Ok(f),
+        StringOrFloat::String(s) => s
+            .replace(',', ".")
+            .trim()
+            .parse::<f64>()
+            .map_err(serde::de::Error::custom),
+    }
+}
+
+fn deserialize_field_f64<'de, D>(deserializer: D) -> Result<Field<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct RawField {
+        #[serde(deserialize_with = "deserialize_flexible_f64")]
+        value: f64,
+        confidence: Confidence,
+    }
+
+    let raw = RawField::deserialize(deserializer)?;
+    Ok(Field {
+        value: raw.value,
+        confidence: raw.confidence,
+    })
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Article {
     pub name: String,
     pub quantity: i32,
+    #[serde(deserialize_with = "deserialize_flexible_f64")]
     pub price_unit: f64,
+    #[serde(deserialize_with = "deserialize_flexible_f64")]
     pub price_total: f64,
+    pub confidence: Confidence,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Receipt {
-    pub retailer: String,
-    pub date: Option<String>,
+    pub retailer: Field<String>,
+    pub date: Field<Option<String>>,
     pub articles: Vec<Article>,
-    pub total_amount: f64,
+    #[serde(deserialize_with = "deserialize_field_f64")]
+    pub total_amount: Field<f64>,
+    pub global_confidence: Confidence,
 }
 
 #[derive(Serialize)]

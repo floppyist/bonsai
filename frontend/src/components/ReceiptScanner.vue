@@ -74,8 +74,8 @@ const resetScanner = () => {
 
     <div v-if="receiptData" class="receipt-card">
       <div class="receipt-header">
-        <h2>{{ receiptData.retailer || 'Unbekannter Händler' }}</h2>
-        <h3>{{ receiptData.date }}</h3>
+        <h2>{{ receiptData.retailer.value }}</h2>
+        <h3>{{ receiptData.date.value }}</h3>
       </div>
 
       <div class="receipt-body">
@@ -100,7 +100,7 @@ const resetScanner = () => {
       <div class="receipt-footer">
         <div class="total-row">
           <span>TOTAL AMOUNT</span>
-          <span>{{ formatPrice(receiptData.total_amount) }}</span>
+          <span>{{ formatPrice(receiptData.total_amount.value) }}</span>
         </div>
       </div>
 
