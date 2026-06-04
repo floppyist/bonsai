@@ -1,6 +1,6 @@
 use anyhow::Result;
 use anyhow::Context;
-use log::debug;
+use log::info;
 
 use crate::config::BonsaiOptions;
 use crate::ocr::OllamaMessage;
@@ -12,7 +12,7 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
     let model = &config.lvm.ollama_model;
     let url = &config.lvm.ollama_url;
 
-    debug!("Forwarding request to Ollama model: '{}'...", model);
+    info!("Forwarding request to Ollama model: '{}'...", model);
 
     let prompt = "Extract data from this German receipt precisely into the requested JSON format.\n\n\
                   Take note of these store-specific patterns if present:\n\
@@ -44,9 +44,9 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
             },
         ],
         options: OllamaOptions {
-            temperature: 0.0,
-            top_p: 0.1,
-            num_thread: 8,
+            temperature: config.lvm.temperature,
+            top_p: config.lvm.top_p,
+            num_thread: config.lvm.num_thread,
         },
         format: "json".to_string(),
         stream: false,

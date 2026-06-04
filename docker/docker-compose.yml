@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: bonsai-backend
+    ports:
+      - "3000:3000"
+    networks:
+      - bonsai-net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: bonsai-frontend
+    ports:
+      - "5173:5173"
+    networks:
+      - bonsai-net
+    restart: unless-stopped
+
+networks:
+  bonsai-net:
+    driver: bridge

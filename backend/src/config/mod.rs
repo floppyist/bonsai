@@ -9,6 +9,7 @@ pub struct BonsaiOptions {
     pub preprocessing: PreprocessingOptions,
     pub lvm: LVMOptions,
     pub logging: LoggingOptions,
+    pub database: DatabaseOptions,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -24,6 +25,9 @@ pub struct PreprocessingOptions {
 pub struct LVMOptions {
     pub ollama_model: String,
     pub ollama_url: String,
+    pub temperature: f32,
+    pub top_p: f32,
+    pub num_thread: i32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -32,6 +36,12 @@ pub struct LoggingOptions {
     pub file: bool,
     pub path: String,
     pub level: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct DatabaseOptions {
+    pub url: String,
+    pub max_pool_connections: u32,
 }
 
 impl Default for BonsaiOptions {
@@ -45,14 +55,20 @@ impl Default for BonsaiOptions {
             lvm: LVMOptions {
                 ollama_model: "qwen2.5vl:3b".to_string(),
                 ollama_url: "http://localhost:11434/api/chat".to_string(),
+                temperature: 0.0,
+                top_p: 0.1,
+                num_thread: 8,
             },
             logging: LoggingOptions {
-                console: false,
+                console: true,
                 file: false,
                 path: "".to_string(),
-                level: "error".to_string(),
+                level: "info".to_string(),
+            },
+            database: DatabaseOptions {
+                url: "sqlite://sqlite.db".to_string(),
+                max_pool_connections: 5,
             }
-
         }
     }
 }

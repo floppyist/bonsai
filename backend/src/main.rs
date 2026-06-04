@@ -1,26 +1,32 @@
-pub mod config;
-pub mod logger;
-pub mod ocr;
+mod config;
+mod logger;
+mod ocr;
+mod db;
+mod api;
 
 use std::process::exit;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::extract::State;
 use axum::routing::post;
 use axum::extract::DefaultBodyLimit;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::response::Json;
-
-use log::debug;
 
 use log::error;
+use log::info;
+
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
+use sqlx::SqlitePool;
+
 use crate::config::BonsaiOptions;
+use crate::db::establish_database_connection;
 use crate::logger::setup_logging;
+
+pub struct AppState {
+    pub config: BonsaiOptions,
+    pub db: SqlitePool,
+}
 
 #[tokio::main]
 async fn main() {
@@ -30,7 +36,18 @@ async fn main() {
         eprintln!("Error while initializing logger: {}", e);
     }
 
-    let shared_state = Arc::new(options);
+    let pool = match establish_database_connection(&options).await {
+        Ok(p) => p,
+        Err(_) => {
+            error!("Database could not be initialized. Exiting.");
+            exit(1);
+        }
+    };
+
+    let shared_state = Arc::new(AppState {
+        config: options,
+        db: pool,
+    });
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -38,14 +55,14 @@ async fn main() {
         .allow_headers(Any);
 
     let app = Router::new()
-        .route("/api/upload-receipt", post(upload_receipt))
+        .route("/api/upload-receipt", post(api::handlers::upload_receipt))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);
 
     match tokio::net::TcpListener::bind("0.0.0.0:3000").await {
         Ok(listener) => {
-            debug!("Socket binding successfull.");
+            info!("bonsai backend runs on '0.0.0.0:3000'");
 
             match axum::serve(listener, app).await {
                 Ok(_) => {},
@@ -58,22 +75,6 @@ async fn main() {
         Err(e) => {
             error!("Error binding tcp listener: {}", e);
             exit(1);
-        }
-    }
-}
-
-async fn upload_receipt(
-    State(config): State<Arc<BonsaiOptions>>, 
-    body_bytes: axum::body::Bytes
-) -> Result<impl IntoResponse, (StatusCode, String)> {
-    debug!("Starting OCR pipeline...");
-
-    // Config als Referenz in die Pipeline reichen
-    match ocr::run_ocr_pipeline(&body_bytes, &config).await {
-        Ok(receipt) => Ok(Json(receipt)),
-        Err(err) => {
-            error!("Pipeline failed: {:?}", err);
-            Err((StatusCode::INTERNAL_SERVER_ERROR, format!("OCR Pipeline error: {}", err)))
         }
     }
 }
