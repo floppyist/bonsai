@@ -23,6 +23,7 @@ Bonsai is a smart Progressive Web App (PWA) designed to automate your grocery tr
 - [Installation (Void Linux)](#installation-void-linux)
   - [System Dependencies](#system-dependencies)
   - [Ollama Setup](#ollama-setup)
+- [Deployment via Docker](#deployment-via-docker)
 - [Running the Application](#running-the-application)
   - [Backend Server](#backend-server)
   - [Frontend Client](#frontend-client)
@@ -69,6 +70,17 @@ Bonsai utilizes local Vision-Language Models (VLM) for receipt extraction.
    ```bash
    ollama run qwen2.5vl:3b
    ```
+
+---
+
+### Deployment via Docker
+
+If you prefer not to install native C++ dependencies and compilers locally, you can spin up the entire stack (including a CPU/GPU-accelerated Ollama container if configured) using Docker:
+
+```bash
+cd docker
+docker compose up --build
+```
 
 ---
 
