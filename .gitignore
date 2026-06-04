@@ -208,3 +208,4 @@ backend/src/debug_images/**
 backend/config.toml
 
 *.db
+*sqlite*

@@ -60,10 +60,10 @@ impl Default for BonsaiOptions {
                 num_thread: 8,
             },
             logging: LoggingOptions {
-                console: false,
+                console: true,
                 file: false,
                 path: "".to_string(),
-                level: "error".to_string(),
+                level: "info".to_string(),
             },
             database: DatabaseOptions {
                 url: "sqlite://sqlite.db".to_string(),
