@@ -14,38 +14,22 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
 
     info!("Forwarding request to Ollama model: '{}'...", model);
 
-    let prompt = "Extract data from this German receipt precisely into the requested JSON format.\n\n\
-        Strict Rules for Specific Fields:\n\
-        - DATE: Extract the date ONLY if a valid date is explicitly found on the receipt. If no valid date is present, set the \"value\" of date to null. Do not guess or infer the date.\n\n\
-        Take note of these store-specific item/quantity patterns:\n\
-        - NETTO: Item quantities and unit prices are located ABOVE the item row: [quantity] x [unit_price] \\n [name] [price_total]\n\
-        - REWE: Item quantities and unit prices are located BELOW the item row\n\
-        - EDEKA: Item quantities and unit prices are located to the RIGHT of the item name in the format: [name] [unit_price] € x [quantity] [price_total]\n\
-        - LIDL: Item row structure looks like: [name] [unit_price] x [quantity] [price_total]\n\n\
-        Expected JSON schema:\n\
+    let prompt = "[Task: Extract German receipt data into strict JSON]\n\
+        [Constraint: If NO valid date found -> date=null. Do NOT infer.]\n\n\
+        [Store_Layout_Patterns]:\n\
+        - NETTO: [qty] x [unit_p] \\n [name] [total_p] (Qty ABOVE item)\n\
+        - REWE:  [name] [total_p] \\n [qty] x [unit_p] (Qty BELOW item)\n\
+        - EDEKA: [name] [unit_p] € x [qty] [total_p]   (Qty RIGHT of item)\n\
+        - LIDL:  [name] [unit_p] x [qty] [total_p]     (Qty RIGHT of item)\n\n\
+        [Output_Schema]:\n\
         {\n\
-        \"retailer\": {\n\
-        \"value\": \"Name of the store\",\n\
-        \"confidence\": \"high\" or \"medium\" or \"low\"\n\
-        },\n\
-        \"date\": {\n\
-        \"value\": \"DD-MM-YYYY\" or null,\n\
-        \"confidence\": \"high\" or \"medium\" or \"low\"\n\
-        },\n\
+        \"retailer\": { \"value\": string, \"confidence\": \"high\"|\"medium\"|\"low\" },\n\
+        \"date\": { \"value\": \"YYYY-MM-DD\"|null, \"confidence\": \"high\"|\"medium\"|\"low\" },\n\
         \"articles\": [\n\
-        {\n\
-        \"name\": \"Cleaned item name\",\n\
-        \"quantity\": 1,\n\
-        \"price_unit\": 0.00,\n\
-        \"price_total\": 0.00,\n\
-        \"confidence\": \"high\" or \"medium\" or \"low\"\n\
-        }\n\
+        { \"name\": string, \"quantity\": int, \"price_unit\": float, \"price_total\": float, \"confidence\": \"high\"|\"medium\"|\"low\" }\n\
         ],\n\
-        \"total_amount\": {\n\
-        \"value\": 0.00,\n\
-        \"confidence\": \"high\" or \"medium\" or \"low\"\n\
-        },\n\
-        \"global_confidence\": \"high\" or \"medium\" or \"low\"\n\
+        \"total_amount\": { \"value\": float, \"confidence\": \"high\"|\"medium\"|\"low\" },\n\
+        \"global_confidence\": \"high\"|\"medium\"|\"low\"\n\
         }";
 
     let request_body = OllamaRequest {
