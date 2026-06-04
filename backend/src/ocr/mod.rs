@@ -25,7 +25,7 @@ pub struct Article {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Receipt {
     pub retailer: String,
-    pub date: String,
+    pub date: Option<String>,
     pub articles: Vec<Article>,
     pub total_amount: f64,
 }

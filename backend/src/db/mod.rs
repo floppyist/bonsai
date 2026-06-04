@@ -31,7 +31,7 @@ pub async fn establish_database_connection(options: &BonsaiOptions) -> Result<Sq
             Err(e) => {
                 error!("Database creation failed: '{}'", e);
 
-                return Err(DBError::CreationFailed);
+                return Err(DBError::Creation);
             }
         }
     } else {
@@ -47,7 +47,7 @@ pub async fn establish_database_connection(options: &BonsaiOptions) -> Result<Sq
 
     if let Err(e) = migrate!("./migrations").run(&pool).await {
         error!("Migration failed: '{}'", e);
-        return Err(DBError::MigrationFailed);
+        return Err(DBError::Migration);
     }
 
     info!("Connected to database: '{}'", db_url);
@@ -59,7 +59,7 @@ pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DB
     let mut tx = pool.begin().await.map_err(|e| {
         error!("Failed to start transaction: {}", e);
 
-        DBError::TransactionFailed
+        DBError::Transaction
     })?;
 
     let receipt_id = Uuid::new_v4().to_string();
@@ -73,7 +73,7 @@ pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DB
         .await
         .map_err(|e| {
             error!("Failed to insert receipt: {}", e);
-            DBError::QueryFailed
+            DBError::Query
         })?;
 
     for item in &receipt.articles {
@@ -85,7 +85,7 @@ pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DB
             .await
             .map_err(|e| {
                 error!("Failed to upsert product '{}': {}", item.name, e);
-                DBError::QueryFailed
+                DBError::Query
             })?
             .get("id");
 
@@ -102,14 +102,14 @@ pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DB
             .map_err(|e| {
                 error!("Failed to insert receipt item: {}", e);
 
-                DBError::QueryFailed
+                DBError::Query
             })?;
     }
 
     tx.commit().await.map_err(|e| {
         error!("Failed to commit transaction: {}", e);
 
-        DBError::TransactionFailed
+        DBError::Transaction
     })?;
 
     Ok(())

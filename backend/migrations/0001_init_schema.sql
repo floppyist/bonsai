@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS receipts (
     id TEXT PRIMARY KEY NOT NULL,
     retailer TEXT NOT NULL,
-    date TEXT NOT NULL,
+    date TEXT,
     total_amount REAL NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
