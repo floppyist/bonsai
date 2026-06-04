@@ -1,8 +1,12 @@
 CREATE TABLE IF NOT EXISTS receipts (
     id TEXT PRIMARY KEY NOT NULL,
     retailer TEXT NOT NULL,
-    date TEXT NOT NULL,
+    retailer_confidence TEXT NOT NULL,
+    date TEXT,
+    date_confidence TEXT NOT NULL,
     total_amount REAL NOT NULL,
+    total_amount_confidence TEXT NOT NULL,
+    global_confidence TEXT NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -20,6 +24,7 @@ CREATE TABLE IF NOT EXISTS receipt_items (
     quantity INTEGER NOT NULL DEFAULT 1,
     price_unit REAL NOT NULL,
     price_total REAL NOT NULL,
+    confidence TEXT NOT NULL,
     FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
 );
