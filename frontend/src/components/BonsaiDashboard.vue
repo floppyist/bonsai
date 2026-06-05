@@ -1,17 +1,27 @@
 <template>
   <div class="w-full h-full bg-zinc-200 flex justify-center items-center m-0 p-0 antialiased selection:bg-[#CCFF33] selection:text-zinc-900">
 
-    <div class="relative w-full max-w-md h-screen max-h-[932px] bg-[#F4F7F5] md:rounded-[40px] md:border-[8px] md:border-zinc-800 shadow-2xl flex flex-col overflow-hidden">
+    <div class="relative w-full h-screen bg-[#F4F7F5] shadow-2xl flex flex-col overflow-hidden">
 
-      <header class="pt-15 bg-gradient-to-br from-[#2D6A4F] to-[#1B4332] px-5 pt-6 pb-8 text-white rounded-b-[28px] shrink-0">
+      <header class="pt-15 bg-gradient-to-br from-[#2D6A4F] to-[#1B4332] px-5 pt-6 pb-8 text-white shrink-0">
         <div class="flex justify-between items-center mb-5">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 height-2.5 w-2.5 h-2.5 bg-[#CCFF33] rounded-full shadow-[0_0_10px_#CCFF33]"></span>
-            <h1 class="text-2xl font-extrabold tracking-tight">Bonsai</h1>
+          <div class="flex items-center gap-3">
+            <img src="/icon.gif" alt="Bonsai Logo" class="w-8 h-8 object-contain" />
+            <h1 class="text-2xl font-black tracking-tight bg-gradient-to-r from-white via-[#E8F3DC] to-[#CCFF33] bg-clip-text text-transparent">
+              Bonsai
+            </h1>
           </div>
-          <div class="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-xs flex gap-1">
-            <span class="text-zinc-300">Pantry Status:</span>
-            <span class="text-[#CCFF33] font-bold">Optimiert</span>
+
+          <div class="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-xs flex gap-1 items-center transition-all duration-300">
+            <template v-if="isProcessingInBackground">
+              <span class="w-2 h-2 bg-[#CCFF33] rounded-full animate-ping mr-1"></span>
+              <span class="text-zinc-200">KI scannt:</span>
+              <span class="text-[#CCFF33] font-bold">Aktiv</span>
+            </template>
+            <template v-else>
+              <span class="text-zinc-300">Pantry Status:</span>
+              <span class="text-[#CCFF33] font-bold">Optimiert</span>
+            </template>
           </div>
         </div>
 
@@ -97,39 +107,79 @@
           </div>
         </div>
 
-      </main>
-
-      <transition
-        enter-active-class="transition duration-350 ease-out"
-        enter-from-class="opacity-0 scale-105"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition duration-350 ease-in"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-105"
-      >
-        <div v-if="isScanning" class="absolute inset-0 bg-[#1A241F]/95 z-50 flex flex-col items-center justify-between px-6 py-10 text-white">
-          <div class="text-center">
-            <h3 class="text-xl font-bold text-[#CCFF33] mb-1.5">Bonsai Vision Engine</h3>
-            <p class="text-xs text-white/70">Halte den Kassenzettel oder EAN-Code in die Kamera</p>
+        <div v-if="activeTab === 'receipt' && receiptData" class="animate-[fadeIn_0.3s_ease-out]">
+          <div class="mb-4">
+            <h2 class="text-lg font-bold text-[#2D3A34]">Neuer Beleg</h2>
+            <p class="text-xs text-[#6B7C74] font-medium">{{ receiptData.retailer?.value || 'Unbekannter Händler' }} • {{ receiptData.date?.value || 'Datum fehlt' }}</p>
           </div>
 
-          <div class="relative w-[260px] h-[380px] rounded-3xl bg-white/5 shadow-[inset_0_0_40px_rgba(0,0,0,0.5)] overflow-hidden">
-            <div class="absolute left-0 right-0 h-1 bg-gradient-to-b from-transparent via-[#CCFF33] to-transparent animate-[laserMove_2.5s_infinite_linear]"></div>
+          <div class="bg-white rounded-[20px] p-4 shadow-sm border border-black/5 mb-5">
+            <div class="space-y-3">
+              <div v-for="(item, index) in receiptData.articles" :key="index" class="flex justify-between items-start border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
+                <div class="flex-1 pr-3">
+                  <div class="text-sm font-semibold text-[#2D3A34] mb-1">
+                    {{ item.quantity }}x {{ item.name }}
+                  </div>
 
-            <div class="absolute w-6 h-6 border-4 border-[#CCFF33] top-4 left-4 border-r-0 border-b-0 rounded-tl-xl"></div>
-            <div class="absolute w-6 h-6 border-4 border-[#CCFF33] top-4 right-4 border-left-0 border-b-0 rounded-tr-xl"></div>
-            <div class="absolute w-6 h-6 border-4 border-[#CCFF33] bottom-4 left-4 border-r-0 border-t-0 rounded-bl-xl"></div>
-            <div class="absolute w-6 h-6 border-4 border-[#CCFF33] bottom-4 right-4 border-left-0 border-t-0 rounded-br-xl"></div>
+                  <div class="flex items-center">
+                    <span v-if="item.ean" class="text-[10px] font-mono bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
+                      EAN: {{ item.ean }}
+                    </span>
+                    <button v-else @click="triggerEanScan(index, item.name)" class="bg-[#CCFF33] hover:bg-[#bceb2e] text-[#1B4332] border border-[#B7E4C7] px-2 py-1 rounded flex items-center gap-1 text-[10px] font-bold shadow-sm active:scale-95 transition-all">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+                      EAN scannen
+                    </button>
+                  </div>
+                </div>
+                <div class="text-sm font-bold text-[#2D3A34] pt-0.5">
+                  {{ formatPrice(item.price_total) }}
+                </div>
+              </div>
+            </div>
 
-            <div class="absolute bottom-5 left-3 right-3 bg-black/75 border border-white/10 p-2.5 rounded-xl text-[11px] flex items-center gap-2 backdrop-blur-sm animate-[fadeIn_0.3s_ease]" v-if="scanStep > 0">
-              <span class="w-2 h-2 bg-[#CCFF33] rounded-full animate-pulse shadow-[0_0_8px_#CCFF33]"></span>
-              <span v-if="scanStep === 1">OpenCV: Kanten werden isoliert...</span>
-              <span v-if="scanStep === 2">Ollama: Analysiere Artikel (qwen2.5vl)...</span>
-              <span v-if="scanStep === 3">Erfolgreich! Importiere in Pantry...</span>
+            <div class="mt-4 pt-3 border-t-2 border-dashed border-zinc-200 flex justify-between items-center">
+              <span class="font-bold text-[#2D3A34] text-sm">Gesamtsumme</span>
+              <span class="font-black text-[#2D6A4F] text-lg">{{ formatPrice(receiptData.total_amount?.value || 0) }}</span>
             </div>
           </div>
 
-          <button @click="stopScanning" class="bg-white/10 hover:bg-white/20 border-0 text-white px-8 py-3 rounded-full text-sm font-semibold cursor-pointer transition-colors">Abbrechen</button>
+          <button @click="saveAndCloseReceipt" class="w-full bg-[#2D6A4F] text-white font-bold py-3.5 rounded-[16px] shadow-md active:scale-[0.98] transition-transform">
+            In Vorratskammer übernehmen
+          </button>
+        </div>
+
+      </main>
+
+      <input type="file" accept="image/*" capture="environment" ref="fileInput" @change="handleFileUpload" class="hidden" />
+      <input type="file" accept="image/*" capture="environment" ref="eanInput" @change="handleEanUpload" class="hidden" />
+
+      <transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0 backdrop-blur-0"
+        enter-to-class="opacity-100 backdrop-blur-md"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100 backdrop-blur-md"
+        leave-to-class="opacity-0 backdrop-blur-0"
+      >
+        <div v-if="showOverlay" class="absolute inset-0 bg-[#1A241F]/90 z-50 flex flex-col items-center justify-center p-6 text-white text-center">
+
+          <div class="relative w-24 h-24 mb-6 flex items-center justify-center">
+            <div class="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-t-[#CCFF33] border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+            <img src="/icon.gif" alt="Bonsai Processing" class="w-12 h-12 object-contain opacity-80" />
+          </div>
+
+          <h3 class="text-xl font-bold text-[#CCFF33] mb-2">Bonsai Vision Engine</h3>
+
+          <div class="bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl text-xs font-mono text-zinc-300 max-w-[280px] mb-8">
+            <span v-if="scanStep === 1">📤 Foto wird hochgeladen...</span>
+            <span v-if="scanStep === 2">🧠 Ollama analysiert Beleg...</span>
+            <span v-if="scanStep === 3">✅ Auswertung abgeschlossen!</span>
+          </div>
+
+          <button @click="showOverlay = false" class="bg-white/10 hover:bg-white/15 border border-white/20 text-white px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-colors">
+            Im Hintergrund weiterlaufen lassen
+          </button>
         </div>
       </transition>
 
@@ -140,7 +190,7 @@
         </button>
 
         <div class="relative w-[70px] h-[70px] -mt-9">
-          <button @click="startScanning" class="w-[66px] h-[66px] rounded-full bg-gradient-to-br from-[#CCFF33] to-[#52B788] border-4 border-[#F4F7F5] shadow-[0_8px_25px_rgba(82,183,136,0.4)] flex items-center justify-center text-zinc-900 cursor-pointer active:scale-90 active:translate-y-1 transition-all duration-200" aria-label="Kassenzettel scannen">
+          <button @click="triggerCamera" class="w-[66px] h-[66px] rounded-full bg-gradient-to-br from-[#CCFF33] to-[#52B788] border-4 border-[#F4F7F5] shadow-[0_8px_25px_rgba(82,183,136,0.4)] flex items-center justify-center text-zinc-900 cursor-pointer active:scale-90 active:translate-y-1 transition-all duration-200" aria-label="Kassenzettel scannen">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           </button>
         </div>
@@ -159,8 +209,15 @@
 import { ref } from 'vue'
 
 const activeTab = ref('home')
-const isScanning = ref(false)
 const scanStep = ref(0)
+const receiptData = ref(null)
+
+const showOverlay = ref(false)
+const isProcessingInBackground = ref(false)
+
+const fileInput = ref(null)
+const eanInput = ref(null)
+const currentTargetEanIndex = ref(null)
 
 const pantryItems = ref([
   { id: 1, name: 'Frische Bio-Avocado', category: 'Gemüse & Früchte', emoji: '🥑', stock: 90, stockColor: '#52B788', daysLeft: '3 Tage', status: 'urgent' },
@@ -171,45 +228,98 @@ const pantryItems = ref([
   { id: 6, name: 'Eier (Freiland)', category: 'Frischeprodukte', emoji: '🥚', stock: 60, stockColor: '#74C69D', daysLeft: '8 Tage', status: 'good' },
 ])
 
-let t1, t2, t3
+const formatPrice = (price) => {
+  if (typeof price !== 'number') return price;
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(price);
+};
 
-const startScanning = () => {
-  isScanning.value = true
-  scanStep.value = 0
-
-  t1 = setTimeout(() => { scanStep.value = 1 }, 1200)
-  t2 = setTimeout(() => { scanStep.value = 2 }, 2800)
-  t3 = setTimeout(() => {
-    scanStep.value = 3
-    pantryItems.value.unshift({
-      id: Date.now(),
-      name: 'Frisches Basilikum',
-      category: 'Kräuter',
-      emoji: '🌿',
-      stock: 100,
-      stockColor: '#52B788',
-      daysLeft: '7 Tage',
-      status: 'good'
-    })
-    setTimeout(() => { isScanning.value = false }, 1000)
-  }, 4800)
+const triggerCamera = () => {
+  if (fileInput.value) fileInput.value.click()
 }
 
-const stopScanning = () => {
-  isScanning.value = false
-  scanStep.value = 0
-  clearTimeout(t1)
-  clearTimeout(t2)
-  clearTimeout(t3)
-}
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  showOverlay.value = true;
+  isProcessingInBackground.value = true;
+  scanStep.value = 1;
+  receiptData.value = null;
+
+  try {
+    scanStep.value = 2;
+
+    const response = await fetch('http://192.168.188.176:3000/api/upload-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Server error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    receiptData.value = data;
+    scanStep.value = 3;
+
+    setTimeout(() => {
+      showOverlay.value = false;
+      isProcessingInBackground.value = false;
+      activeTab.value = 'receipt';
+    }, 800);
+
+  } catch (error) {
+    console.error('Error while uploading: ', error);
+    alert(error.message);
+    showOverlay.value = false;
+    isProcessingInBackground.value = false;
+  } finally {
+    event.target.value = '';
+  }
+};
+
+const triggerEanScan = (index, articleName) => {
+  currentTargetEanIndex.value = index;
+  if (eanInput.value) {
+    eanInput.value.click();
+  }
+};
+
+const handleEanUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file || currentTargetEanIndex.value === null) return;
+
+  try {
+    const response = await fetch('http://192.168.188.176:3000/api/scan-barcode', {
+      method: 'POST',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      receiptData.value.articles[currentTargetEanIndex.value].ean = data.ean;
+    } else {
+      receiptData.value.articles[currentTargetEanIndex.value].ean = "400123456789";
+    }
+  } catch (err) {
+    console.error("Barcode-Scan fehlgeschlagen, benutze Entwickler-Fallback:", err);
+    receiptData.value.articles[currentTargetEanIndex.value].ean = "400999999999";
+  } finally {
+    currentTargetEanIndex.value = null;
+    event.target.value = '';
+  }
+};
+
+const saveAndCloseReceipt = () => {
+  receiptData.value = null;
+  activeTab.value = 'home';
+};
 </script>
 
 <style>
-@keyframes laserMove {
-  0% { top: 0%; }
-  50% { top: 100%; }
-  100% { top: 0%; }
-}
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
