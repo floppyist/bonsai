@@ -4,7 +4,7 @@
         <title>bonsai</title>
 
         <meta charset="UTF-8">
-        <meta name="viewport" content="initial-scale=1, viewport-fit=cover, width=device-width"></meta>
+        <meta name="viewport" content="initial-scale=1, viewport-fit=cover, width=device-width user-scalable=no"></meta>
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
         <link rel="icon" href="/logo.png">
@@ -25,17 +25,16 @@
             scrollbar-width: none;  /* Firefox */
         }
 
-        body {
-            /* Use full display height on iOS */
+        /* Suppress iOS "bouncy" scrolling */
+        html, body {
             height: 100vh;
-
-            /* Disable bouncy scrolling on iOS */
             overflow: hidden;
+            overscroll-behavior: none;
         }
         </style>
     </head>
-    <body class="h-full">
-        <div id="app"></div>
+    <body>
+        <div id="app" class="h-full"></div>
         <script type="module" src="/src/main.js"></script>
     </body>
 </html>
