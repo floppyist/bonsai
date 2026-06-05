@@ -2,7 +2,128 @@
 import { ref } from 'vue';
 
 const isLoading = ref(false);
-const receiptData = ref(null);
+const receiptData = {
+  "retailer": {
+    "value": "REWE",
+    "confidence": "High"
+  },
+  "date": {
+    "value": "2026-05-28",
+    "confidence": "High"
+  },
+  "articles": [
+    {
+      "name": "D.-SAFT 0. FFL",
+      "quantity": 1,
+      "price_unit": 2.59,
+      "price_total": 2.59,
+      "confidence": "High"
+    },
+    {
+      "name": "PFAND 0,25 EURO",
+      "quantity": 1,
+      "price_unit": 0.25,
+      "price_total": 0.25,
+      "confidence": "High"
+    },
+    {
+      "name": "REWE WOKMISCHUNG",
+      "quantity": 1,
+      "price_unit": 1.99,
+      "price_total": 1.99,
+      "confidence": "High"
+    },
+    {
+      "name": "MG FETTE BRUEHE",
+      "quantity": 1,
+      "price_unit": 0.99,
+      "price_total": 0.99,
+      "confidence": "High"
+    },
+    {
+      "name": "SAUVIGNON BLANC",
+      "quantity": 1,
+      "price_unit": 6.99,
+      "price_total": 6.99,
+      "confidence": "High"
+    },
+    {
+      "name": "MOSCATO",
+      "quantity": 1,
+      "price_unit": 5.99,
+      "price_total": 5.99,
+      "confidence": "High"
+    },
+    {
+      "name": "MOSCATO",
+      "quantity": 1,
+      "price_unit": 5.99,
+      "price_total": 5.99,
+      "confidence": "High"
+    },
+    {
+      "name": "MOSCATO",
+      "quantity": 1,
+      "price_unit": 5.99,
+      "price_total": 5.99,
+      "confidence": "High"
+    },
+    {
+      "name": "MOSCATO",
+      "quantity": 1,
+      "price_unit": 5.99,
+      "price_total": 5.99,
+      "confidence": "High"
+    },
+    {
+      "name": "MOSCATO",
+      "quantity": 1,
+      "price_unit": 5.99,
+      "price_total": 5.99,
+      "confidence": "High"
+    },
+    {
+      "name": "GOESSER N. RADLER",
+      "quantity": 2,
+      "price_unit": 2.5,
+      "price_total": 5.0,
+      "confidence": "High"
+    },
+    {
+      "name": "PFAND 0,08 EUR",
+      "quantity": 2,
+      "price_unit": 0.16,
+      "price_total": 0.32,
+      "confidence": "High"
+    },
+    {
+      "name": "KARAMALZ",
+      "quantity": 1,
+      "price_unit": 0.89,
+      "price_total": 0.89,
+      "confidence": "High"
+    },
+    {
+      "name": "PFAND 0,08 EUR",
+      "quantity": 1,
+      "price_unit": 0.08,
+      "price_total": 0.08,
+      "confidence": "High"
+    },
+    {
+      "name": "PEPE FINE GREEN",
+      "quantity": 1,
+      "price_unit": 6.3,
+      "price_total": 6.3,
+      "confidence": "High"
+    }
+  ],
+  "total_amount": {
+    "value": 28.73,
+    "confidence": "High"
+  },
+  "global_confidence": "High"
+}
 
 const formatPrice = (price) => {
   if (typeof price !== 'number') return price;
@@ -51,9 +172,7 @@ const resetScanner = () => {
 </script>
 
 <template>
-  <div class="scanner-wrapper flex flex-col h-screen justify-center items-center">
-    <h1 class="text-4xl text-sky-100 font-bold">Receipt Scanner</h1>
-
+  <div class="overflow-y-auto">
     <div v-if="!isLoading && !receiptData" class="upload-section w-full flex justify-center flex-col">
       <label class="bg-sky-700 hover:bg-sky-500 text-white font-bold m-5 rounded text-center p-3">
         Capture photo / Upload
@@ -72,7 +191,7 @@ const resetScanner = () => {
       <p class="text-white">Image is being analyzed...</p>
     </div>
 
-    <div v-if="receiptData" class="receipt-card">
+    <div v-if="receiptData" class="receipt-card h-full">
       <div class="receipt-header">
         <h2>{{ receiptData.retailer.value }}</h2>
         <h3>{{ receiptData.date.value }}</h3>
@@ -110,13 +229,6 @@ const resetScanner = () => {
 </template>
 
 <style scoped>
-.scanner-wrapper {
-  max-width: 400px;
-  margin: 0 auto;
-  font-family: 'Courier New', Courier, monospace;
-  padding: 20px;
-}
-
 .hint {
   text-align: center;
   font-size: 0.6em;
@@ -148,8 +260,6 @@ const resetScanner = () => {
   border: 1px solid #ddd;
   padding: 20px;
   box-shadow: 0px 5px 15px rgba(0,0,0,0.05);
-  position: relative;
-  margin-top: 20px;
   color: #333;
 }
 
