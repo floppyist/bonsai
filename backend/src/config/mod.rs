@@ -3,25 +3,26 @@ use std::fs;
 use serde::Serialize;
 use serde::Deserialize;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct BonsaiOptions {
     pub general: GeneralOptions,
     pub preprocessing: PreprocessingOptions,
     pub lvm: LVMOptions,
     pub logging: LoggingOptions,
     pub database: DatabaseOptions,
+    pub tls: TlsOptions,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct GeneralOptions {
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct PreprocessingOptions {
     pub debug_dir: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct LVMOptions {
     pub ollama_model: String,
     pub ollama_url: String,
@@ -30,7 +31,7 @@ pub struct LVMOptions {
     pub num_thread: i32,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct LoggingOptions {
     pub console: bool,
     pub file: bool,
@@ -38,10 +39,16 @@ pub struct LoggingOptions {
     pub level: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct DatabaseOptions {
     pub url: String,
     pub max_pool_connections: u32,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct TlsOptions {
+    pub cert_path: String,
+    pub key_path: String,
 }
 
 impl Default for BonsaiOptions {
@@ -68,7 +75,11 @@ impl Default for BonsaiOptions {
             database: DatabaseOptions {
                 url: "sqlite://sqlite.db".to_string(),
                 max_pool_connections: 5,
-            }
+            },
+            tls: TlsOptions { 
+                cert_path: "certs/server.crt".to_string(),
+                key_path: "certs/server.key".to_string(),
+            },
         }
     }
 }
