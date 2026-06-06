@@ -200,7 +200,7 @@ to { opacity: 1; transform: translateY(0); }
         />
       </main>
 
-      <input type="file" accept="image/*" capture="environment" ref="fileInput" @change="handleFileUpload" class="hidden" />
+      <input type="file" accept="image/*" ref="fileInput" @change="handleFileUpload" class="hidden" />
 
       <VisionOverlay :showOverlay="showOverlay" :scanStep="scanStep" @closeOverlay="showOverlay = false" />
 
