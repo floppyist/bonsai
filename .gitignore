@@ -209,3 +209,4 @@ backend/config.toml
 
 *.db
 *sqlite*
+certs/

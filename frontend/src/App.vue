@@ -54,7 +54,7 @@ const handleFileUpload = (event) => {
 
   worker.postMessage({
     file: file,
-    url: '/api/upload-receipt'
+    url: 'https://bonsai.pi:3000/api/upload-receipt'
   });
 
   worker.onmessage = (e) => {
