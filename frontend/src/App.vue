@@ -142,8 +142,8 @@ const saveAndCloseReceipt = () => {
 </script>
 
 <template>
-  <div class="w-full h-full bg-zinc-200 flex justify-center items-center m-0 p-0 antialiased selection:bg-[#CCFF33] selection:text-zinc-900">
-    <div class="relative w-full h-screen bg-[#F4F7F5] shadow-2xl flex flex-col overflow-hidden">
+  <div class="w-full h-screen bg-zinc-200 flex justify-center items-center m-0 p-0 antialiased selection:bg-[#CCFF33] selection:text-zinc-900">
+    <div class="relative w-full h-full bg-[#F4F7F5] shadow-2xl flex flex-col overflow-hidden">
 
       <PantryHeader :isProcessingInBackground="isProcessingInBackground" />
 
@@ -161,7 +161,6 @@ const saveAndCloseReceipt = () => {
       </main>
 
       <input type="file" accept="image/*" ref="fileInput" @change="handleFileUpload" class="hidden" />
-
       <VisionOverlay :showOverlay="showOverlay" :scanStep="scanStep" @closeOverlay="showOverlay = false" />
 
       <EanScannerModal
