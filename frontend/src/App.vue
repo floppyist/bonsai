@@ -132,6 +132,19 @@ const stopEanScanner = () => {
     codeReaderControls.stop();
     codeReaderControls = null;
   }
+
+  const videoElement = document.querySelector('video');
+  if (videoElement && videoElement.srcObject) {
+    const stream = videoElement.srcObject;
+    const tracks = stream.getTracks();
+
+    tracks.forEach(track => {
+      track.stop();
+    });
+
+    videoElement.srcObject = null;
+  }
+
   codeReaderInstance = null;
 };
 
