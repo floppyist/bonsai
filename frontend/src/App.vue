@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, provide } from 'vue'
 import { useRouter } from 'vue-router'
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library'
 
@@ -23,6 +23,9 @@ const currentTargetEanName = ref('')
 let codeReaderInstance = null
 let codeReaderControls = null
 
+const isDevMode = ref(false)
+provide('isDevMode', isDevMode)
+
 const pantryItems = ref([
   { id: 1, name: 'Frische Bio-Avocado', category: 'Gemüse & Früchte', emoji: '🥑', stock: 90, stockColor: '#52B788', daysLeft: '3 Tage', status: 'urgent' },
   { id: 2, name: 'Hafermilch (Barista)', category: 'Getränke', emoji: '🥛', stock: 40, stockColor: '#D8F3DC', daysLeft: '12 Tage', status: 'good' },
@@ -31,6 +34,19 @@ const pantryItems = ref([
   { id: 5, name: 'Griechischer Joghurt', category: 'Milchprodukte', emoji: '🥣', stock: 75, stockColor: '#74C69D', daysLeft: '6 Tage', status: 'warn' },
   { id: 6, name: 'Eier (Freiland)', category: 'Frischeprodukte', emoji: '🥚', stock: 60, stockColor: '#74C69D', daysLeft: '8 Tage', status: 'good' },
 ])
+
+const MOCK_RECEIPT_DATA = {
+  id: 'mock-dev-123',
+  store_name: 'Bio-Markt Bonsai (Mock)',
+  date: new Date().toISOString().split('T')[0],
+  total_amount: 24.95,
+  items: [
+    { name: 'Bio-Hafermilch 1L', quantity: 2, price: 1.99 },
+    { name: 'Avocado Premium', quantity: 1, price: 2.49 },
+    { name: 'Dinkelbrot 500g', quantity: 1, price: 3.89 },
+    { name: 'Kaffeebohnen Arabica 1kg', quantity: 1, price: 14.59 }
+  ]
+}
 
 const formatPrice = (price) => {
   if (typeof price !== 'number') return price;
@@ -50,6 +66,29 @@ const handleFileUpload = (event) => {
   scanStep.value = 1;
   receiptData.value = null;
   scanStep.value = 2;
+
+  if (isDevMode.value) {
+    setTimeout(() => {
+      receiptData.value = {
+        articles: MOCK_RECEIPT_DATA.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          ean: null
+        }))
+      };
+      scanStep.value = 3;
+
+      setTimeout(() => {
+        showOverlay.value = false;
+        isProcessingInBackground.value = false;
+        router.push({ name: 'receipt' });
+      }, 800);
+    }, 1000);
+
+    event.target.value = '';
+    return;
+  }
 
   const worker = new Worker(new URL('./workers/receiptWorker.js', import.meta.url), { type: 'module' });
 
@@ -73,7 +112,6 @@ const handleFileUpload = (event) => {
       setTimeout(() => {
         showOverlay.value = false;
         isProcessingInBackground.value = false;
-        // Navigation zur Beleg-Auswertung via Router
         router.push({ name: 'receipt' });
       }, 800);
     }
