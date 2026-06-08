@@ -5,10 +5,10 @@ const props = defineProps({
   receiptData: {
     type: Object,
     default: () => ({
-      store_name: '',
-      date: '',
+      retailer: { value: '' },
+      date: { value: '' },
       articles: [],
-      total_amount: null
+      total_amount: { value: null }
     })
   },
   formatPrice: {
@@ -19,31 +19,51 @@ const props = defineProps({
 
 const emit = defineEmits(['startEanScanner', 'saveAndCloseReceipt'])
 
-const editedStore = ref(props.receiptData?.store_name || 'Unbekannter Händler')
-const editedDate = ref(props.receiptData?.date || new Date().toISOString().split('T')[0])
+const editedStore = ref('')
+const editedDate = ref('')
+const articles = ref([])
 
-const articles = ref(
-  props.receiptData?.articles
-    ? props.receiptData.articles.map(item => ({
+const parseIncomingData = (data) => {
+  if (!data) return
+
+  if (data.retailer && typeof data.retailer === 'object' && 'value' in data.retailer) {
+    editedStore.value = data.retailer.value || 'Unbekannter Händler'
+  } else {
+    editedStore.value = data.store_name || data.retailer || 'Unbekannter Händler'
+  }
+
+  if (data.date && typeof data.date === 'object' && 'value' in data.date) {
+    editedDate.value = data.date.value || new Date().toISOString().split('T')[0]
+  } else {
+    editedDate.value = data.date || new Date().toISOString().split('T')[0]
+  }
+
+  if (data.articles && Array.isArray(data.articles)) {
+    articles.value = data.articles.map(item => {
+      let extractedPrice = 0.00
+      if (item.price !== undefined && item.price !== null) {
+        extractedPrice = Number(item.price)
+      } else if (item.price_unit !== undefined && item.price_unit !== null) {
+        extractedPrice = Number(item.price_unit)
+      }
+
+      return {
         ...item,
-        price: item.price !== undefined && item.price !== null
-          ? Number(item.price)
-          : (item.price_unit !== undefined ? Number(item.price_unit) : 0.00),
+        price: extractedPrice,
         quantity: item.quantity || 1,
         name: item.name || 'Unbekannter Artikel',
         ean: item.ean || null
-      }))
-    : []
-)
-
-watch(() => props.receiptData?.articles, (newArticles) => {
-  if (newArticles) {
-    newArticles.forEach((art, i) => {
-      if (articles.value[i] && art.ean !== undefined) {
-        articles.value[i].ean = art.ean
       }
     })
+  } else {
+    articles.value = []
   }
+}
+
+parseIncomingData(props.receiptData)
+
+watch(() => props.receiptData, (newData) => {
+  parseIncomingData(newData)
 }, { deep: true })
 
 const updateEan = (index, newEan) => {
@@ -238,7 +258,6 @@ const handleSave = () => {
               ? (isDuplicateArticle(item)
                   ? 'bg-amber-50/60 border-amber-500/40 p-4 space-y-3.5 shadow-sm'
                   : 'bg-[#F4F7F5] border-[#2D6A4F]/20 p-4 space-y-3.5')
-              // Zustand 2: Reihe ist geschlossen
               : (isDuplicateArticle(item)
                   ? 'bg-amber-50/40 border-amber-500/25 hover:bg-amber-50/70 p-3 flex items-center justify-between gap-3 text-amber-950'
                   : (item.ean
