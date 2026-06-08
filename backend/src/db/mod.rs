@@ -64,55 +64,55 @@ pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DB
 
     sqlx::query(
         "INSERT INTO receipts (id, retailer, retailer_confidence, date, date_confidence, total_amount, total_amount_confidence, global_confidence) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .bind(&receipt_id)
-    .bind(&receipt.retailer.value)
-    .bind(format!("{:?}", receipt.retailer.confidence).to_lowercase())
-    .bind(&receipt.date.value)
-    .bind(format!("{:?}", receipt.date.confidence).to_lowercase())
-    .bind(receipt.total_amount.value)
-    .bind(format!("{:?}", receipt.total_amount.confidence).to_lowercase())
-    .bind(format!("{:?}", receipt.global_confidence).to_lowercase())
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| {
-        error!("Failed to insert receipt: {}", e);
-        DBError::Query
-    })?;
-
-    for item in &receipt.articles {
-        // Upsert in 'products' via Name
-        let product_id: i64 = sqlx::query(
-            "INSERT INTO products (name) VALUES (?) \
-             ON CONFLICT(name) DO UPDATE SET name=name \
-             RETURNING id"
-        )
-        .bind(&item.name)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| {
-            error!("Failed to upsert product '{}': {}", item.name, e);
-            DBError::Query
-        })?
-        .get("id");
-
-        sqlx::query(
-            "INSERT INTO receipt_items (receipt_id, product_id, quantity, price_unit, price_total, confidence) \
-             VALUES (?, ?, ?, ?, ?, ?)"
-        )
         .bind(&receipt_id)
-        .bind(product_id)
-        .bind(item.quantity)
-        .bind(item.price_unit)
-        .bind(item.price_total)
-        .bind(format!("{:?}", item.confidence).to_lowercase())
+        .bind(&receipt.retailer.value)
+        .bind(format!("{:?}", receipt.retailer.confidence).to_lowercase())
+        .bind(&receipt.date.value)
+        .bind(format!("{:?}", receipt.date.confidence).to_lowercase())
+        .bind(receipt.total_amount.value)
+        .bind(format!("{:?}", receipt.total_amount.confidence).to_lowercase())
+        .bind(format!("{:?}", receipt.global_confidence).to_lowercase())
         .execute(&mut *tx)
         .await
         .map_err(|e| {
-            error!("Failed to insert receipt item: {}", e);
+            error!("Failed to insert receipt: {}", e);
             DBError::Query
         })?;
+
+    for item in &receipt.articles {
+        // Upsert in 'products' via name
+        let product_id: i64 = sqlx::query(
+            "INSERT INTO products (name) VALUES (?) \
+                ON CONFLICT(name) DO UPDATE SET name=name \
+                RETURNING id"
+        )
+            .bind(&item.name)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| {
+                error!("Failed to upsert product '{}': {}", item.name, e);
+                DBError::Query
+            })?
+            .get("id");
+
+        sqlx::query(
+            "INSERT INTO receipt_items (receipt_id, product_id, quantity, price_unit, price_total, confidence) \
+                VALUES (?, ?, ?, ?, ?, ?)"
+        )
+            .bind(&receipt_id)
+            .bind(product_id)
+            .bind(item.quantity)
+            .bind(item.price_unit)
+            .bind(item.price_total)
+            .bind(format!("{:?}", item.confidence).to_lowercase())
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| {
+                error!("Failed to insert receipt item: {}", e);
+                DBError::Query
+            })?;
     }
 
     tx.commit().await.map_err(|e| {

@@ -35,11 +35,13 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
     let request_body = OllamaRequest {
         model: model.to_string(),
         messages: vec![
+            /* Define basic vlm role */
             OllamaMessage {
                 role: "system".to_string(),
                 content: "You are a precise OCR parser for receipts. Respond exclusively in the requested JSON format without any extra markdown wrapper or text.".to_string(),
                 images: None,
             },
+            /* Push prompt */
             OllamaMessage {
                 role: "user".to_string(),
                 content: prompt.to_string(),
