@@ -8,10 +8,12 @@ defineEmits(['startEanScanner', 'saveAndCloseReceipt'])
 </script>
 
 <template>
-  <div class="animate-[fadeIn_0.3s_ease-out]">
+  <div v-if="receiptData" class="animate-[fadeIn_0.3s_ease-out]">
     <div class="mb-4">
       <h2 class="text-lg font-bold text-[#2D3A34]">Neuer Beleg</h2>
-      <p class="text-xs text-[#6B7C74] font-medium">{{ receiptData.retailer?.value || 'Unbekannter Händler' }} • {{ receiptData.date?.value || 'Datum fehlt' }}</p>
+      <p class="text-xs text-[#6B7C74] font-medium">
+        {{ receiptData.retailer?.value || 'Unbekannter Händler' }} • {{ receiptData.date?.value || 'Datum fehlt' }}
+      </p>
     </div>
 
     <div class="bg-white rounded-[20px] p-4 shadow-sm border border-black/5 mb-5">
@@ -48,5 +50,10 @@ defineEmits(['startEanScanner', 'saveAndCloseReceipt'])
     <button @click="$emit('saveAndCloseReceipt')" class="w-full bg-[#2D6A4F] text-white font-bold py-3.5 rounded-[16px] shadow-md active:scale-[0.98] transition-transform">
       In Vorratskammer übernehmen
     </button>
+  </div>
+
+  <div v-else class="text-center pt-10 text-zinc-500 text-sm flex flex-col items-center gap-3">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M9 11h6"/></svg>
+    <p>Kein aktiver Beleg geladen. Scanne einen Beleg über die Kamera.</p>
   </div>
 </template>

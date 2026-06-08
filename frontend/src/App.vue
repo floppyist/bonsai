@@ -1,16 +1,15 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library'
 
 import PantryHeader from './components/PantryHeader.vue'
-import PantryTab from './components/PantryTab.vue'
-import BudgetTab from './components/BudgetTab.vue'
-import ReceiptTab from './components/ReceiptTab.vue'
 import VisionOverlay from './components/VisionOverlay.vue'
 import EanScannerModal from './components/modals/EanScannerModal.vue'
 import BottomNav from './components/BottomNav.vue'
 
-const activeTab = ref('home')
+const router = useRouter()
+
 const scanStep = ref(0)
 const receiptData = ref(null)
 const showOverlay = ref(false)
@@ -74,7 +73,8 @@ const handleFileUpload = (event) => {
       setTimeout(() => {
         showOverlay.value = false;
         isProcessingInBackground.value = false;
-        activeTab.value = 'receipt';
+        // Navigation zur Beleg-Auswertung via Router
+        router.push({ name: 'receipt' });
       }, 800);
     }
     worker.terminate();
@@ -95,7 +95,6 @@ const initializeQrScanner = async (videoElement) => {
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8]);
 
     codeReaderInstance = new BrowserMultiFormatReader(hints);
-
     codeReaderInstance.timeBetweenDecodingAttempts = 100;
 
     const constraints = {
@@ -138,22 +137,9 @@ const stopEanScanner = () => {
 
 const saveAndCloseReceipt = () => {
   receiptData.value = null;
-  activeTab.value = 'home';
+  router.push({ name: 'pantry' });
 };
 </script>
-
-<style>
-@keyframes fadeIn {
-from { opacity: 0; transform: translateY(8px); }
-to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scanLine {
-0% { top: 0%; opacity: 0.3; }
-50% { top: 100%; opacity: 1; }
-100% { top: 0%; opacity: 0.3; }
-}
-</style>
 
 <template>
   <div class="w-full h-full bg-zinc-200 flex justify-center items-center m-0 p-0 antialiased selection:bg-[#CCFF33] selection:text-zinc-900">
@@ -162,15 +148,16 @@ to { opacity: 1; transform: translateY(0); }
       <PantryHeader :isProcessingInBackground="isProcessingInBackground" />
 
       <main class="flex-1 overflow-y-auto p-5 pb-28 scrollbar-thin scrollbar-thumb-zinc-300">
-        <PantryTab v-if="activeTab === 'home'" :pantryItems="pantryItems" />
-        <BudgetTab v-if="activeTab === 'analytics'" />
-        <ReceiptTab
-          v-if="activeTab === 'receipt' && receiptData"
-          :receiptData="receiptData"
-          :formatPrice="formatPrice"
-          @startEanScanner="startEanScanner"
-          @saveAndCloseReceipt="saveAndCloseReceipt"
-        />
+        <router-view v-slot="{ Component }">
+          <component
+            :is="Component"
+            :pantryItems="pantryItems"
+            :receiptData="receiptData"
+            :formatPrice="formatPrice"
+            @startEanScanner="startEanScanner"
+            @saveAndCloseReceipt="saveAndCloseReceipt"
+          />
+        </router-view>
       </main>
 
       <input type="file" accept="image/*" ref="fileInput" @change="handleFileUpload" class="hidden" />
@@ -184,8 +171,21 @@ to { opacity: 1; transform: translateY(0); }
         @videoReady="initializeQrScanner"
       />
 
-      <BottomNav :activeTab="activeTab" @updateTab="activeTab = $event" @triggerCamera="triggerCamera" />
+      <BottomNav @triggerCamera="triggerCamera" />
 
     </div>
   </div>
 </template>
+
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scanLine {
+  0% { top: 0%; opacity: 0.3; }
+  50% { top: 100%; opacity: 1; }
+  100% { top: 0%; opacity: 0.3; }
+}
+</style>
