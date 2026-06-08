@@ -196,7 +196,10 @@ const saveAndCloseReceipt = () => {
   <div class="w-full h-screen bg-zinc-200 flex justify-center items-center m-0 p-0 antialiased selection:bg-[#CCFF33] selection:text-zinc-900">
     <div class="relative w-full h-full bg-[#F4F7F5] shadow-2xl flex flex-col overflow-hidden">
 
-      <PantryHeader :isProcessingInBackground="isProcessingInBackground" />
+      <PantryHeader
+  :isProcessingInBackground="isProcessingInBackground"
+  @bringOverlayToForeground="showOverlay = true"
+/>
 
       <main class="flex-1 overflow-y-auto p-5 pb-28 scrollbar-thin scrollbar-thumb-zinc-300">
         <router-view v-slot="{ Component }">

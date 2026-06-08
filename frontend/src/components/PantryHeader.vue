@@ -2,6 +2,8 @@
 defineProps({
   isProcessingInBackground: Boolean
 })
+
+defineEmits(['bringOverlayToForeground'])
 </script>
 
 <template>
@@ -14,7 +16,13 @@ defineProps({
         </h1>
       </div>
 
-      <div class="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-xs flex gap-1 items-center transition-all duration-300">
+      <div
+        @click="isProcessingInBackground && $emit('bringOverlayToForeground')"
+        :class="[
+          'bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-xs flex gap-1 items-center transition-all duration-300',
+          isProcessingInBackground ? 'cursor-pointer hover:bg-white/20 active:scale-95' : ''
+        ]"
+      >
         <template v-if="isProcessingInBackground">
           <span class="w-2 h-2 bg-[#CCFF33] rounded-full animate-ping mr-1"></span>
           <span class="text-zinc-200">KI scannt:</span>
