@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import QrScanner from 'qr-scanner'
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library'
 
 import PantryHeader from './components/PantryHeader.vue'
 import PantryTab from './components/PantryTab.vue'
@@ -20,7 +20,9 @@ const fileInput = ref(null)
 const showEanModal = ref(false)
 const currentTargetEanIndex = ref(null)
 const currentTargetEanName = ref('')
-let qrScannerInstance = null
+
+let codeReaderInstance = null
+let codeReaderControls = null
 
 const pantryItems = ref([
   { id: 1, name: 'Frische Bio-Avocado', category: 'Gemüse & Früchte', emoji: '🥑', stock: 90, stockColor: '#52B788', daysLeft: '3 Tage', status: 'urgent' },
@@ -88,67 +90,37 @@ const startEanScanner = (index) => {
 };
 
 const initializeQrScanner = async (videoElement) => {
-  let detailsText = "";
-
   try {
-    detailsText += `[1/4] Prüfe Verfügbarkeit von navigator.mediaDevices...\n`;
-    if (!navigator.mediaDevices) {
-      throw new Error("navigator.mediaDevices ist undefined! (Unsicherer HTTP-Kontext auf iOS?)");
-    }
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8]);
 
-    detailsText += `[2/4] Instanziiere QrScanner...\n`;
-    qrScannerInstance = new QrScanner(
+    codeReaderInstance = new BrowserMultiFormatReader(hints);
+
+    codeReaderInstance.timeBetweenDecodingAttempts = 100;
+
+    const constraints = {
+      video: {
+        facingMode: "environment",
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    };
+
+    codeReaderControls = await codeReaderInstance.decodeFromConstraints(
+      constraints,
       videoElement,
-      (result) => {
-        if (result && result.data) {
-          receiptData.value.articles[currentTargetEanIndex.value].ean = result.data;
+      (result, err) => {
+        if (result) {
+          receiptData.value.articles[currentTargetEanIndex.value].ean = result.getText();
           stopEanScanner();
-        }
-      },
-      {
-        onDecodeError: () => {},
-        maxScansPerSecond: 20,
-        highlightScanRegion: false,
-        highlightCodeOutline: false,
-        returnDetailedScanResult: true,
-        constraints: {
-          video: { facingMode: { exact: "environment" } }
         }
       }
     );
 
-    detailsText += `[3/4] Starte QrScanner (Rückkamera)...\n`;
-    await qrScannerInstance.start();
-
   } catch (err) {
-    detailsText += `❌ Fehler im ersten Versuch: Name=${err.name}, Message=${err.message}\n`;
-    detailsText += `[4/4] Weiche auf Fallback-Kamera-Konfiguration aus...\n`;
-
-    try {
-      if (qrScannerInstance) qrScannerInstance.destroy();
-
-      qrScannerInstance = new QrScanner(
-        videoElement,
-        (result) => {
-          if (result && result.data) {
-            receiptData.value.articles[currentTargetEanIndex.value].ean = result.data;
-            stopEanScanner();
-          }
-        },
-        {
-          onDecodeError: () => {},
-          maxScansPerSecond: 20
-        }
-      );
-      await qrScannerInstance.start();
-    } catch (fallbackErr) {
-      detailsText += `❌ Fataler Fallback-Fehler: Name=${fallbackErr.name}, Message=${fallbackErr.message}\n`;
-      detailsText += `Stack: ${fallbackErr.stack || 'Kein Stacktrace'}`;
-
-      console.error("Kompletter Kamera-Fehler-Log:", detailsText);
-      alert(`DIAGNOSE-LOG:\n\n${detailsText}`);
-      showEanModal.value = false;
-    }
+    console.error("Kamera-Setup fehlgeschlagen:", err);
+    alert(`Fehler beim Starten der Kamera: ${err.message}`);
+    showEanModal.value = false;
   }
 };
 
@@ -157,10 +129,11 @@ const stopEanScanner = () => {
   currentTargetEanIndex.value = null;
   currentTargetEanName.value = '';
 
-  if (qrScannerInstance) {
-    qrScannerInstance.destroy();
-    qrScannerInstance = null;
+  if (codeReaderControls) {
+    codeReaderControls.stop();
+    codeReaderControls = null;
   }
+  codeReaderInstance = null;
 };
 
 const saveAndCloseReceipt = () => {

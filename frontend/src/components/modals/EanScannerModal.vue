@@ -38,7 +38,7 @@ watch(() => props.showEanModal, async (newVal) => {
       </div>
 
       <div class="relative w-full aspect-square max-w-[320px] mx-auto bg-black rounded-2xl overflow-hidden border-2 border-white/10 flex items-center justify-center">
-        <video ref="videoElement" class="w-full h-full object-cover" playsinline muted></video>
+        <video ref="videoElement" class="w-full h-full object-cover" autoplay playsinline muted></video>
         <div class="absolute inset-x-6 h-[2px] bg-[#CCFF33] shadow-[0_0_12px_#CCFF33] animate-[scanLine_2s_infinite_ease-in-out]"></div>
         <div class="absolute inset-6 border-2 border-dashed border-white/20 pointer-events-none rounded-xl"></div>
       </div>
