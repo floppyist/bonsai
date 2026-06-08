@@ -7,7 +7,8 @@ const props = defineProps({
     default: () => ({
       store_name: '',
       date: '',
-      articles: []
+      articles: [],
+      total_amount: null
     })
   },
   formatPrice: {
@@ -111,12 +112,45 @@ const isMissingEan = computed(() => {
   return articles.value.some(item => !item.ean)
 })
 
+const hasDuplicateEan = computed(() => {
+  const eans = articles.value
+    .map(item => item.ean)
+    .filter(ean => ean !== null && ean !== undefined && ean !== '')
+  return new Set(eans).size !== eans.length
+})
+
+const isDuplicateArticle = (item) => {
+  if (!item.ean) return false
+  return articles.value.filter(a => a.ean === item.ean).length > 1
+}
+
 const totalAmount = computed(() => {
   return articles.value.reduce((sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0)
 })
 
+const scannedTotalAmount = computed(() => {
+  const total = props.receiptData?.total_amount
+  if (total && typeof total === 'object' && 'value' in total) {
+    return total.value !== undefined && total.value !== null ? Number(total.value) : null
+  }
+  return total !== undefined && total !== null ? Number(total) : null
+})
+
+const hasAmountMismatch = computed(() => {
+  if (scannedTotalAmount.value === null) return false
+  return totalAmount.value.toFixed(2) !== scannedTotalAmount.value.toFixed(2)
+})
+
+const isStoreInvalid = computed(() => !editedStore.value || editedStore.value.trim() === '' || editedStore.value === 'Unbekannter Händler')
+const isDateInvalid = computed(() => !editedDate.value || editedDate.value.trim() === '')
+const isPriceInvalid = computed(() => totalAmount.value <= 0)
+
+const isFormInvalid = computed(() => {
+  return isStoreInvalid.value || isDateInvalid.value || isPriceInvalid.value || isMissingEan.value || hasDuplicateEan.value
+})
+
 const handleSave = () => {
-  if (isMissingEan.value) return
+  if (isFormInvalid.value) return
   const updatedData = {
     ...props.receiptData,
     store_name: editedStore.value,
@@ -138,7 +172,12 @@ const handleSave = () => {
         <div class="flex gap-2">
           <button
             @click="showStoreDropdown = !showStoreDropdown"
-            class="flex-1 text-left bg-[#F4F7F5] border border-zinc-200/60 rounded-xl px-4 py-3 text-sm font-bold text-[#2D3A34] flex justify-between items-center cursor-pointer min-h-[48px]"
+            :class="[
+              'flex-1 text-left rounded-xl px-4 py-3 text-sm font-bold flex justify-between items-center cursor-pointer min-h-[48px] transition-all duration-200 border',
+              isStoreInvalid
+                ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 shadow-sm shadow-amber-50'
+                : 'bg-[#F4F7F5] border-zinc-200/60 text-[#2D3A34]'
+            ]"
           >
             <span>{{ editedStore }}</span>
             <span class="text-xs opacity-50">▼</span>
@@ -146,7 +185,12 @@ const handleSave = () => {
           <input
             v-model="editedStore"
             placeholder="Oder tippen..."
-            class="w-1/3 bg-[#F4F7F5] border border-zinc-200/60 rounded-xl px-3 py-3 text-xs text-[#2D3A34] focus:outline-none focus:border-[#2D6A4F] min-h-[48px]"
+            :class="[
+              'w-1/3 rounded-xl px-3 py-3 text-xs focus:outline-none min-h-[48px] transition-all duration-200 border',
+              isStoreInvalid
+                ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 focus:border-amber-500'
+                : 'bg-[#F4F7F5] border-zinc-200/60 text-[#2D3A34] focus:border-[#2D6A4F]'
+            ]"
           />
         </div>
 
@@ -164,11 +208,18 @@ const handleSave = () => {
 
       <div class="w-full block">
         <label class="text-[10px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-1">Belegdatum</label>
-        <input
-          type="date"
-          v-model="editedDate"
-          class="w-full box-border bg-[#F4F7F5] border border-zinc-200/60 rounded-xl px-4 py-3 text-sm font-bold text-[#2D3A34] focus:outline-none focus:border-[#2D6A4F] min-h-[48px]"
-        />
+        <div class="w-full relative block">
+          <input
+            type="date"
+            v-model="editedDate"
+            :class="[
+              'w-full max-w-full box-border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none min-h-[48px] appearance-none transition-all duration-200 border',
+              isDateInvalid
+                ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 focus:border-amber-500 shadow-sm shadow-amber-50'
+                : 'bg-[#F4F7F5] border-zinc-200/60 text-[#2D3A34] focus:border-[#2D6A4F]'
+            ]"
+          />
+        </div>
       </div>
     </div>
 
@@ -184,10 +235,16 @@ const handleSave = () => {
           :class="[
             'rounded-xl transition-all border duration-200',
             activeEditIndex === index
-              ? 'bg-[#F4F7F5] border-[#2D6A4F]/20 p-4 space-y-3.5'
-              : (item.ean
-                  ? 'bg-[#EAF5ED]/60 border-[#2D6A4F]/15 hover:bg-[#EAF5ED]/90 p-3 flex items-center justify-between gap-3'
-                  : 'bg-white hover:bg-[#F4F7F5]/30 border-zinc-100 p-3 flex items-center justify-between gap-3'
+              ? (isDuplicateArticle(item)
+                  ? 'bg-amber-50/60 border-amber-500/40 p-4 space-y-3.5 shadow-sm'
+                  : 'bg-[#F4F7F5] border-[#2D6A4F]/20 p-4 space-y-3.5')
+              // Zustand 2: Reihe ist geschlossen
+              : (isDuplicateArticle(item)
+                  ? 'bg-amber-50/40 border-amber-500/25 hover:bg-amber-50/70 p-3 flex items-center justify-between gap-3 text-amber-950'
+                  : (item.ean
+                      ? 'bg-[#EAF5ED]/60 border-[#2D6A4F]/15 hover:bg-[#EAF5ED]/90 p-3 flex items-center justify-between gap-3'
+                      : 'bg-white hover:bg-[#F4F7F5]/30 border-zinc-100 p-3 flex items-center justify-between gap-3'
+                    )
                 )
           ]"
         >
@@ -198,8 +255,8 @@ const handleSave = () => {
                   v-model="item.name"
                   class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
                 />
-                <div v-if="item.ean" class="text-[10px] font-mono font-bold text-[#2D6A4F] px-1">
-                  EAN: {{ item.ean }}
+                <div v-if="item.ean" :class="['text-[10px] font-mono font-bold px-1', isDuplicateArticle(item) ? 'text-amber-700' : 'text-[#2D6A4F]']">
+                  EAN: {{ item.ean }} <span v-if="isDuplicateArticle(item)">(Duplikat!)</span>
                 </div>
                 <div class="flex flex-wrap gap-1">
                   <button
@@ -226,9 +283,12 @@ const handleSave = () => {
                   @click="emit('startEanScanner', index)"
                   :class="[
                     'text-xs font-bold px-4 py-2 rounded-xl border transition-colors cursor-pointer h-10 flex items-center shadow-sm',
-                    item.ean
-                      ? 'bg-[#EAF5ED] border-[#2D6A4F]/30 text-[#2D6A4F] hover:bg-[#D8F3DC]'
-                      : 'bg-[#D8F3DC] border-[#74C69D] text-[#1B4332] animate-pulse'
+                    isDuplicateArticle(item)
+                      ? 'bg-amber-100 border-amber-400 text-amber-800 hover:bg-amber-200'
+                      : (item.ean
+                          ? 'bg-[#EAF5ED] border-[#2D6A4F]/30 text-[#2D6A4F] hover:bg-[#D8F3DC]'
+                          : 'bg-[#D8F3DC] border-[#74C69D] text-[#1B4332] animate-pulse'
+                        )
                   ]"
                 >
                   {{ item.ean ? '✓ EAN erneut scannen' : 'EAN Scan' }}
@@ -281,15 +341,18 @@ const handleSave = () => {
             </div>
           </template>
 
-          <template v-else>
+          <template v-if="activeEditIndex !== index">
             <div @click="toggleEditRow(index)" class="flex-1 min-w-0 cursor-pointer py-1">
               <div class="text-xs font-bold text-[#2D3A34] truncate flex items-center gap-2">
                 <span>{{ item.name }}</span>
                 <span v-if="!item.ean" class="w-1.5 h-1.5 rounded-full bg-amber-500" title="EAN fehlt"></span>
+                <span v-else-if="isDuplicateArticle(item)" class="w-2 h-2 rounded-full bg-red-500 animate-ping" title="EAN doppelt"></span>
               </div>
-              <div class="text-[10px] text-[#6B7C74] font-medium mt-0.5">
+              <div :class="['text-[10px] font-medium mt-0.5', isDuplicateArticle(item) ? 'text-amber-800' : 'text-[#6B7C74]']">
                 {{ item.quantity || 1 }}x · {{ Number(item.price).toFixed(2) }} €
-                <span v-if="item.ean" class="ml-1 text-[#2D6A4F] font-mono font-bold">| EAN: {{ item.ean }}</span>
+                <span v-if="item.ean" :class="['ml-1 font-mono font-bold', isDuplicateArticle(item) ? 'text-red-700' : 'text-[#2D6A4F]']">
+                  | EAN: {{ item.ean }} {{ isDuplicateArticle(item) ? '(Doppelt)' : '' }}
+                </span>
               </div>
             </div>
 
@@ -302,12 +365,15 @@ const handleSave = () => {
                 @click="emit('startEanScanner', index)"
                 :class="[
                   'text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer min-h-[40px] flex items-center shadow-sm border',
-                  item.ean
-                    ? 'bg-[#EAF5ED] hover:bg-[#D8F3DC] text-[#2D6A4F] border-[#2D6A4F]/20'
-                    : 'bg-[#D8F3DC] hover:bg-[#b7e4c7] text-[#1B4332] border-[#74C69D]'
+                  isDuplicateArticle(item)
+                    ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                    : (item.ean
+                        ? 'bg-[#EAF5ED] hover:bg-[#D8F3DC] text-[#2D6A4F] border-[#2D6A4F]/20'
+                        : 'bg-[#D8F3DC] hover:bg-[#b7e4c7] text-[#1B4332] border-[#74C69D]'
+                      )
                 ]"
               >
-                {{ item.ean ? 'EAN ändern' : 'EAN Scan' }}
+                {{ item.ean ? (isDuplicateArticle(item) ? 'EAN korrigieren' : 'EAN ändern') : 'EAN Scan' }}
               </button>
             </div>
           </template>
@@ -333,19 +399,62 @@ const handleSave = () => {
         </span>
       </div>
 
+      <div
+        v-if="hasDuplicateEan"
+        class="bg-red-500/20 text-red-300 border border-red-500/30 rounded-xl p-3 text-xs font-semibold flex items-start gap-2.5 animate-[fadeIn_0.2s_ease-out]"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-red-400 shrink-0 mt-0.5">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div>
+          <span class="font-bold block text-white">Doppelte Barcodes!</span>
+          <span class="opacity-90">Einige Artikel besitzen dieselbe EAN. Jeder Artikel muss eindeutig sein (gelb markiert).</span>
+        </div>
+      </div>
+
+      <div
+        v-if="hasAmountMismatch && !hasDuplicateEan"
+        class="bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl p-3 text-xs font-semibold flex items-start gap-2.5 animate-[fadeIn_0.2s_ease-out]"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400 shrink-0 mt-0.5">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <div>
+          <span class="font-bold block text-white">Betrag weicht ab!</span>
+          <span class="opacity-90">Gescanntes Total vom Beleg: {{ formatPrice(scannedTotalAmount) }}</span>
+        </div>
+      </div>
+
       <button
         @click="handleSave"
-        :disabled="isMissingEan"
+        :disabled="isFormInvalid"
         :class="[
           'w-full font-bold py-4 px-4 rounded-xl text-sm shadow-lg transition-all duration-200 min-h-[48px]',
-          isMissingEan
+          isFormInvalid
             ? 'bg-zinc-700/50 text-zinc-400 border border-zinc-600/30 cursor-not-allowed opacity-60'
             : 'bg-[#CCFF33] hover:bg-[#b2eb2a] text-zinc-900 cursor-pointer active:scale-[0.99]'
         ]"
       >
-        {{ isMissingEan ? 'Bitte erst alle Barcodes scannen' : 'Daten bestätigen & Einbuchen' }}
+        <template v-if="isMissingEan">Bitte erst alle Barcodes scannen</template>
+        <template v-else-if="hasDuplicateEan">Doppelte Barcodes korrigieren</template>
+        <template v-else-if="isPriceInvalid">Preis/Summe darf nicht 0 € sein</template>
+        <template v-else-if="isStoreInvalid">Händler-Namen korrigieren</template>
+        <template v-else-if="isDateInvalid">Gültiges Belegdatum angeben</template>
+        <template v-else>Daten bestätigen & Einbuchen</template>
       </button>
     </div>
 
   </div>
 </template>
+
+<style scoped>
+input[type="date"]::-webkit-calendar-picker-indicator {
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+</style>
