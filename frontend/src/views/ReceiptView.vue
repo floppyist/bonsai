@@ -23,7 +23,6 @@ const editedStore = ref('')
 const editedDate = ref('')
 const articles = ref([])
 
-// Konstante Definition aller 20 Kategorien für das UI-Mapping
 const categoriesList = [
   { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
   { value: 'DAIRY_EGGS', label: '🥛 Milchprodukte & Eier' },
@@ -82,7 +81,8 @@ const parseIncomingData = (data) => {
         quantity: item.quantity || 1,
         name: item.name || 'Unbekannter Artikel',
         ean: item.ean || null,
-        category: item.category || 'UNCATEGORIZED' // Fallback-Zuweisung
+        category: item.category || 'UNCATEGORIZED',
+        brand: item.brand || 'UNKNOWN'
       }
     })
   } else {
@@ -121,6 +121,9 @@ const updateEan = async (index, newEan) => {
       if (data.category) {
         articles.value[index].category = data.category
       }
+      if (data.brand) {
+        articles.value[index].brand = data.brand
+      }
     } else {
       console.log("Produkt nicht in globaler EAN-Datenbank hinterlegt.");
     }
@@ -133,7 +136,15 @@ defineExpose({
   updateEan
 })
 
-const commonStores = ['Edeka', 'REWE', 'Aldi', 'Lidl', 'Kaufland', 'Bio-Markt', 'Netto', 'Penny']
+const commonStores = [
+  'REWE', 'Edeka', 'Kaufland', 'Globus', 'hit', 'Tegut',
+  'Aldi Süd', 'Aldi Nord', 'Lidl', 'Netto', 'Penny', 'Norma',
+  'dm', 'Rossmann', 'Müller', 'Denns BioMarkt', 'Alnatura', 'Bio-Markt',
+  'OBI', 'Bauhaus', 'Hornbach', 'Toom', 'Toom Baumarkt',
+  'MediaMarkt', 'Saturn', 'Thalia',
+  'Action', 'TEDi', 'Decathlon', 'IKEA'
+].sort((a, b) => a.localeCompare(b, 'de'))
+
 const showStoreDropdown = ref(false)
 
 const selectStore = (name) => {
@@ -170,7 +181,8 @@ const addNewArticle = () => {
     quantity: 1,
     price: 1.00,
     ean: null,
-    category: 'UNCATEGORIZED'
+    category: 'UNCATEGORIZED',
+    brand: 'UNKNOWN',
   })
   activeEditIndex.value = articles.value.length - 1
 }
@@ -255,9 +267,10 @@ const handleSave = async () => {
       quantity: parseFloat(item.quantity) || 1.0,
       price: parseFloat(item.price) || 0.0,
       ean: item.ean || null,
-      category: item.category || 'UNCATEGORIZED' // Typsich ans Backend übergeben
+      category: item.category || 'UNCATEGORIZED',
+      brand: item.brand || 'UNKNOWN' // <-- NEU ans Backend senden
     }))
-  }
+  };
 
   try {
     const response = await fetch('/api/finalize-receipt', {
@@ -372,12 +385,22 @@ const handleSave = async () => {
           <template v-if="activeEditIndex === index">
             <div class="flex justify-between items-start gap-2">
               <div class="flex-1 space-y-2">
-                <div>
-                  <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Artikelbezeichnung</label>
-                  <input
-                    v-model="item.name"
-                    class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
-                  />
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Artikelbezeichnung</label>
+                    <input
+                      v-model="item.name"
+                      class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Marke / Hersteller / Autor</label>
+                    <input
+                      v-model="item.brand"
+                      placeholder="z.B. Eigenmarke, Alnatura, Autor..."
+                      class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -483,7 +506,7 @@ const handleSave = async () => {
                   @click="toggleEditRow(index)"
                   class="bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-bold text-xs py-3 rounded-xl transition-colors border border-zinc-300/40 cursor-pointer flex items-center justify-center min-h-[46px]"
                 >
-                  Verwerfen
+                  Abbrechen
                 </button>
               </div>
             </div>
@@ -491,8 +514,11 @@ const handleSave = async () => {
 
           <template v-if="activeEditIndex !== index">
             <div @click="toggleEditRow(index)" class="flex-1 min-w-0 cursor-pointer py-1">
-              <div class="text-xs font-bold text-[#2D3A34] truncate flex items-center gap-2">
+              <div class="text-xs font-bold text-[#2D3A34] truncate flex items-center gap-1.5 flex-wrap">
                 <span>{{ item.name }}</span>
+                <span v-if="item.brand && item.brand !== 'UNKNOWN'" class="text-[10px] text-[#6B7C74] font-medium bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200/30">
+                  {{ item.brand }}
+                </span>
                 <span v-if="!item.ean" class="w-1.5 h-1.5 rounded-full bg-amber-500" title="EAN fehlt"></span>
                 <span v-else-if="isDuplicateArticle(item)" class="w-2 h-2 rounded-full bg-red-500 animate-ping" title="EAN doppelt"></span>
               </div>

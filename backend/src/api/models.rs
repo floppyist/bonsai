@@ -17,4 +17,5 @@ pub struct FinalizeArticleItem {
     pub ean: Option<String>,
     #[serde(default)]
     pub category: ProductCategory,
+    pub brand: String,
 }
