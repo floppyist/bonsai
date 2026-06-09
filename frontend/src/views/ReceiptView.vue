@@ -23,6 +23,35 @@ const editedStore = ref('')
 const editedDate = ref('')
 const articles = ref([])
 
+// Konstante Definition aller 20 Kategorien für das UI-Mapping
+const categoriesList = [
+  { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
+  { value: 'DAIRY_EGGS', label: '🥛 Milchprodukte & Eier' },
+  { value: 'FRUIT_VEGETABLES', label: '🥦 Obst & Gemüse' },
+  { value: 'MEAT_FISH', label: '🥩 Fleisch, Fisch & Ersatz' },
+  { value: 'STAPLE_FOODS', label: '🍝 Grundnahrungsmittel' },
+  { value: 'CANNED_JARRED', label: '🥫 Konserven & Gläser' },
+  { value: 'OILS_SAUCES_SPICES', label: '🫚 Öle, Saucen & Gewürze' },
+  { value: 'BREAKFAST_SPREADS', label: '🍯 Frühstück & Aufstriche' },
+  { value: 'SNACKS_SWEETS', label: '🍫 Süßwaren & Knabberzeug' },
+  { value: 'BEVERAGES', label: '☕ Getränke' },
+  { value: 'DRUGSTORE_BEAUTY', label: '🧴 Drogerie & Kosmetik' },
+  { value: 'HOUSEHOLD_CLEANING', label: '🧹 Haushalt & Reinigung' },
+  { value: 'PET_SUPPLIES', label: '🐾 Haustierbedarf' },
+  { value: 'ELECTRONICS', label: '🔌 Elektronik & Zubehör' },
+  { value: 'STATIONERY_OFFICE', label: '✏️ Schreibwaren & Büro' },
+  { value: 'HOME_LIVING', label: '🍳 Wohnen & Küche' },
+  { value: 'CLOTHING_TEXTILES', label: '🧦 Kleidung & Textilien' },
+  { value: 'DIY_GARDEN', label: '🛠️ Baumarkt & Garten' },
+  { value: 'BOOKS_MEDIA', label: '📚 Medien & Freizeit' },
+  { value: 'UNCATEGORIZED', label: '❓ Unkategorisiert' }
+]
+
+const getCategoryLabel = (value) => {
+  const cat = categoriesList.find(c => c.value === value)
+  return cat ? cat.label : '❓ Unkategorisiert'
+}
+
 const parseIncomingData = (data) => {
   if (!data) return
 
@@ -52,7 +81,8 @@ const parseIncomingData = (data) => {
         price: extractedPrice,
         quantity: item.quantity || 1,
         name: item.name || 'Unbekannter Artikel',
-        ean: item.ean || null
+        ean: item.ean || null,
+        category: item.category || 'UNCATEGORIZED' // Fallback-Zuweisung
       }
     })
   } else {
@@ -88,6 +118,9 @@ const updateEan = async (index, newEan) => {
 
     if (data.found && data.name) {
       articles.value[index].name = data.name
+      if (data.category) {
+        articles.value[index].category = data.category
+      }
     } else {
       console.log("Produkt nicht in globaler EAN-Datenbank hinterlegt.");
     }
@@ -136,7 +169,8 @@ const addNewArticle = () => {
     name: 'Neuer Artikel',
     quantity: 1,
     price: 1.00,
-    ean: null
+    ean: null,
+    category: 'UNCATEGORIZED'
   })
   activeEditIndex.value = articles.value.length - 1
 }
@@ -212,17 +246,18 @@ const handleSave = async () => {
 
   isSubmitting.value = true
 
-const payload = {
-  retailer: editedStore.value || 'Unbekannter Händler',
-  receipt_date: editedDate.value || new Date().toISOString().split('T')[0],
-  total_amount: Number(totalAmount.value.toFixed(2)),
-  articles: articles.value.map(item => ({
-    name: item.name,
-    quantity: parseFloat(item.quantity) || 1.0,
-    price: parseFloat(item.price) || 0.0,
-    ean: item.ean || null
-  }))
-}
+  const payload = {
+    retailer: editedStore.value || 'Unbekannter Händler',
+    receipt_date: editedDate.value || new Date().toISOString().split('T')[0],
+    total_amount: Number(totalAmount.value.toFixed(2)),
+    articles: articles.value.map(item => ({
+      name: item.name,
+      quantity: parseFloat(item.quantity) || 1.0,
+      price: parseFloat(item.price) || 0.0,
+      ean: item.ean || null,
+      category: item.category || 'UNCATEGORIZED' // Typsich ans Backend übergeben
+    }))
+  }
 
   try {
     const response = await fetch('/api/finalize-receipt', {
@@ -238,7 +273,6 @@ const payload = {
     }
 
     console.log('Kassenbon erfolgreich verbucht!')
-
     emit('saveAndCloseReceipt')
 
   } catch (error) {
@@ -337,11 +371,27 @@ const payload = {
         >
           <template v-if="activeEditIndex === index">
             <div class="flex justify-between items-start gap-2">
-              <div class="flex-1 space-y-1.5">
-                <input
-                  v-model="item.name"
-                  class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
-                />
+              <div class="flex-1 space-y-2">
+                <div>
+                  <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Artikelbezeichnung</label>
+                  <input
+                    v-model="item.name"
+                    class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
+                  />
+                </div>
+
+                <div>
+                  <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Kategorie</label>
+                  <select
+                    v-model="item.category"
+                    class="w-full bg-white border border-zinc-300 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none focus:border-[#2D6A4F] text-[#2D3A34] min-h-[38px] cursor-pointer"
+                  >
+                    <option v-for="cat in categoriesList" :key="cat.value" :value="cat.value">
+                      {{ cat.label }}
+                    </option>
+                  </select>
+                </div>
+
                 <div v-if="item.ean" :class="['text-[10px] font-mono font-bold px-1', isDuplicateArticle(item) ? 'text-amber-700' : 'text-[#2D6A4F]']">
                   EAN: {{ item.ean }} <span v-if="isDuplicateArticle(item)">(Duplikat!)</span>
                 </div>
@@ -446,9 +496,14 @@ const payload = {
                 <span v-if="!item.ean" class="w-1.5 h-1.5 rounded-full bg-amber-500" title="EAN fehlt"></span>
                 <span v-else-if="isDuplicateArticle(item)" class="w-2 h-2 rounded-full bg-red-500 animate-ping" title="EAN doppelt"></span>
               </div>
-              <div :class="['text-[10px] font-medium mt-0.5', isDuplicateArticle(item) ? 'text-amber-800' : 'text-[#6B7C74]']">
-                {{ item.quantity || 1 }}x · {{ Number(item.price).toFixed(2) }} €
-                <span v-if="item.ean" :class="['ml-1 font-mono font-bold', isDuplicateArticle(item) ? 'text-red-700' : 'text-[#2D6A4F]']">
+              <div :class="['text-[10px] font-medium mt-0.5 flex flex-wrap items-center gap-1.5', isDuplicateArticle(item) ? 'text-amber-800' : 'text-[#6B7C74]']">
+                <span>{{ item.quantity || 1 }}x · {{ Number(item.price).toFixed(2) }} €</span>
+
+                <span class="bg-[#F4F7F5] text-[#2D6A4F] px-1.5 py-0.5 rounded text-[9px] font-bold border border-zinc-200/30">
+                  {{ getCategoryLabel(item.category) }}
+                </span>
+
+                <span v-if="item.ean" :class="['font-mono font-bold', isDuplicateArticle(item) ? 'text-red-700' : 'text-[#2D6A4F]']">
                   | EAN: {{ item.ean }} {{ isDuplicateArticle(item) ? '(Doppelt)' : '' }}
                 </span>
               </div>

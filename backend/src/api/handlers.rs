@@ -14,6 +14,7 @@ use axum::Extension;
 use log::error;
 
 use super::models::FinalizeReceiptPayload;
+use crate::api::categories::ProductCategory; // Das neue Kategorie-Enum importieren
 
 use crate::AppState;
 use crate::ocr;
@@ -98,13 +99,14 @@ pub async fn finalize_receipt(
 
     let receipt_id: i64 = receipt_row.get("id");
 
-for article in payload.articles {
+    for article in payload.articles {
         let mut product_id: Option<i64> = None;
         let mut existing_ean: Option<String> = None;
+        let mut existing_category: ProductCategory = ProductCategory::Uncategorized;
 
         if let Some(ref ean_code) = article.ean {
             let row = sqlx::query(
-                "SELECT id, ean FROM products WHERE ean = ? AND is_deleted = 0 LIMIT 1"
+                "SELECT id, ean, category FROM products WHERE ean = ? AND is_deleted = 0 LIMIT 1"
             )
             .bind(ean_code)
             .fetch_optional(&mut *tx)
@@ -114,12 +116,13 @@ for article in payload.articles {
             if let Some(r) = row {
                 product_id = Some(r.get("id"));
                 existing_ean = r.get("ean");
+                existing_category = r.get("category");
             }
         }
 
         if product_id.is_none() {
             let row = sqlx::query(
-                "SELECT id, ean FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
+                "SELECT id, ean, category FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
             )
             .bind(&article.name)
             .fetch_optional(&mut *tx)
@@ -129,15 +132,22 @@ for article in payload.articles {
             if let Some(r) = row {
                 product_id = Some(r.get("id"));
                 existing_ean = r.get("ean");
+                existing_category = r.get("category");
             }
         }
 
         let final_product_id = match product_id {
             Some(id) => {
-                // Wenn wir eine neue EAN vom User haben, das Produkt in der DB aber noch keine hat: Update!
-                if existing_ean.is_none() && article.ean.is_some() {
-                    sqlx::query("UPDATE products SET ean = ? WHERE id = ?")
-                        .bind(&article.ean)
+                let need_ean_update = existing_ean.is_none() && article.ean.is_some();
+                let need_category_update = existing_category == ProductCategory::Uncategorized && article.category != ProductCategory::Uncategorized;
+
+                if need_ean_update || need_category_update {
+                    let target_ean = article.ean.as_ref().or(existing_ean.as_ref());
+                    let target_category = if need_category_update { article.category } else { existing_category };
+
+                    sqlx::query("UPDATE products SET ean = ?, category = ? WHERE id = ?")
+                        .bind(target_ean)
+                        .bind(target_category)
                         .bind(id)
                         .execute(&mut *tx)
                         .await
@@ -147,10 +157,11 @@ for article in payload.articles {
             },
             None => {
                 let new_product_row = sqlx::query(
-                    "INSERT INTO products (name, ean) VALUES (?, ?) RETURNING id"
+                    "INSERT INTO products (name, ean, category) VALUES (?, ?, ?) RETURNING id"
                 )
                 .bind(&article.name)
                 .bind(&article.ean)
+                .bind(article.category)
                 .fetch_one(&mut *tx)
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -174,10 +185,11 @@ for article in payload.articles {
         if let Some(ref ean_code) = article.ean {
             if !ean_code.trim().is_empty() {
                 let _ = sqlx::query(
-                    "INSERT OR IGNORE INTO ean_products (ean, name) VALUES (?, ?)"
+                    "INSERT OR IGNORE INTO ean_products (ean, name, category) VALUES (?, ?, ?)"
                 )
                 .bind(ean_code)
                 .bind(&article.name)
+                .bind(article.category)
                 .execute(&state.ean_db)
                 .await;
             }
