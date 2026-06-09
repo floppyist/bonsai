@@ -1,57 +1,75 @@
 mod error;
 
-use log::debug;
-use log::info;
-use log::error;
-
-use sqlx::Sqlite;
-use sqlx::SqlitePool;
-use sqlx::migrate;
+use log::{debug, error, info};
+use sqlx::{migrate, Row, Sqlite, SqlitePool};
 use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::Row;
-
-use uuid::Uuid;
 
 use crate::config::BonsaiOptions;
 use crate::db::error::DBError;
 use crate::ocr::Receipt;
 
-pub async fn establish_database_connection(options: &BonsaiOptions) -> Result<SqlitePool, DBError> {
-    let db_url = &options.database.url;
+#[derive(Clone)]
+pub struct DatabasePools {
+    pub user_db: SqlitePool,
+    pub ean_db: SqlitePool,
+}
 
-    if !Sqlite::database_exists(db_url).await.unwrap_or(false) {
-        info!("Creating database {}", db_url);
-
-        match Sqlite::create_database(db_url).await {
-            Ok(_) => {
-                info!("{} created successfully", db_url);
-            },
-            Err(e) => {
-                error!("Database creation failed: '{}'", e);
-
-                return Err(DBError::Creation);
-            }
+pub async fn establish_database_connections(options: &BonsaiOptions) -> Result<DatabasePools, DBError> {
+    let user_db_url = &options.database.user_db_url;
+    
+    if !Sqlite::database_exists(user_db_url).await.unwrap_or(false) {
+        info!("Creating database {}", user_db_url);
+        if let Err(e) = Sqlite::create_database(user_db_url).await {
+            error!("Database creation failed: '{}'", e);
+            return Err(DBError::Creation);
         }
     } else {
-        debug!("Database '{}' already exists", db_url);
+        debug!("Database '{}' already exists", user_db_url);
     }
+    
+    let user_pool = SqlitePoolOptions::new()
+        .max_connections(options.database.user_db_max_pool_connections)
+        .connect(user_db_url)
+        .await
+        .map_err(|_| DBError::Creation)?;
 
-    let pool = SqlitePoolOptions::new()
-        .max_connections(options.database.max_pool_connections)
-        .connect(db_url)
-        .await.unwrap();
-
-    debug!("Process DB migration...");
-
-    if let Err(e) = migrate!("./migrations/user").run(&pool).await {
+    debug!("Process DB migration for {}...", user_db_url);
+    if let Err(e) = migrate!("./migrations/user").run(&user_pool).await {
         error!("Migration failed: '{}'", e);
         return Err(DBError::Migration);
     }
+    info!("Connected to database: '{}'", user_db_url);
 
-    info!("Connected to database: '{}'", db_url);
+    let ean_db_url = &options.database.ean_db_url;
+    
+    if !Sqlite::database_exists(ean_db_url).await.unwrap_or(false) {
+        info!("Creating database {}", ean_db_url);
+        if let Err(e) = Sqlite::create_database(ean_db_url).await {
+            error!("Database creation failed: '{}'", e);
+            return Err(DBError::Creation);
+        }
+    } else {
+        debug!("Database '{}' already exists", ean_db_url);
+    }
+    
+    let ean_pool = SqlitePoolOptions::new()
+        .max_connections(options.database.ean_db_max_pool_connections)
+        .connect(ean_db_url)
+        .await
+        .map_err(|_| DBError::Creation)?;
 
-    Ok(pool)
+    debug!("Process DB migration for {}...", ean_db_url);
+    if let Err(e) = migrate!("./migrations/ean").run(&ean_pool).await {
+        error!("Migration failed: '{}'", e);
+        return Err(DBError::Migration);
+    }
+    info!("Connected to database: '{}'", ean_db_url);
+
+    Ok(DatabasePools {
+        user_db: user_pool,
+        ean_db: ean_pool,
+    })
 }
 
 pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DBError> {
@@ -60,59 +78,64 @@ pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DB
         DBError::Transaction
     })?;
 
-    let receipt_id = Uuid::new_v4().to_string();
-
-    sqlx::query(
-        "INSERT INTO receipts (id, retailer, retailer_confidence, date, date_confidence, total_amount, total_amount_confidence, global_confidence) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    let receipt_id: i64 = sqlx::query(
+        "INSERT INTO receipts (retailer, receipt_date) VALUES (?, ?) RETURNING id"
     )
-        .bind(&receipt_id)
-        .bind(&receipt.retailer.value)
-        .bind(format!("{:?}", receipt.retailer.confidence).to_lowercase())
-        .bind(&receipt.date.value)
-        .bind(format!("{:?}", receipt.date.confidence).to_lowercase())
-        .bind(receipt.total_amount.value)
-        .bind(format!("{:?}", receipt.total_amount.confidence).to_lowercase())
-        .bind(format!("{:?}", receipt.global_confidence).to_lowercase())
-        .execute(&mut *tx)
+    .bind(&receipt.retailer.value)
+    .bind(&receipt.date.value)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| {
+        error!("Failed to insert receipt: {}", e);
+        DBError::Query
+    })?
+    .get("id");
+
+    for item in &receipt.articles {
+        let product_match = sqlx::query(
+            "SELECT id FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
+        )
+        .bind(&item.name)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|e| {
-            error!("Failed to insert receipt: {}", e);
+            error!("Failed to query product '{}': {}", item.name, e);
             DBError::Query
         })?;
 
-    for item in &receipt.articles {
-        // Upsert in 'products' via name
-        let product_id: i64 = sqlx::query(
-            "INSERT INTO products (name) VALUES (?) \
-                ON CONFLICT(name) DO UPDATE SET name=name \
-                RETURNING id"
-        )
-            .bind(&item.name)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(|e| {
-                error!("Failed to upsert product '{}': {}", item.name, e);
-                DBError::Query
-            })?
-            .get("id");
+        let product_id: i64 = match product_match {
+            Some(row) => row.get("id"),
+            None => {
+                sqlx::query(
+                    "INSERT INTO products (name, ean) VALUES (?, ?) RETURNING id"
+                )
+                .bind(&item.name)
+                .bind(None::<&str>)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!("Failed to insert product '{}': {}", item.name, e);
+                    DBError::Query
+                })?
+                .get("id")
+            }
+        };
+
+        let price_in_cents = (item.price_total * 100.0).round() as i64;
 
         sqlx::query(
-            "INSERT INTO receipt_items (receipt_id, product_id, quantity, price_unit, price_total, confidence) \
-                VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT INTO receipt_items (receipt_id, product_id, quantity, price) VALUES (?, ?, ?, ?)"
         )
-            .bind(&receipt_id)
-            .bind(product_id)
-            .bind(item.quantity)
-            .bind(item.price_unit)
-            .bind(item.price_total)
-            .bind(format!("{:?}", item.confidence).to_lowercase())
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| {
-                error!("Failed to insert receipt item: {}", e);
-                DBError::Query
-            })?;
+        .bind(receipt_id)
+        .bind(product_id)
+        .bind(item.quantity)
+        .bind(price_in_cents)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            error!("Failed to insert receipt item: {}", e);
+            DBError::Query
+        })?;
     }
 
     tx.commit().await.map_err(|e| {
@@ -121,4 +144,31 @@ pub async fn save_receipt(pool: &SqlitePool, receipt: &Receipt) -> Result<(), DB
     })?;
 
     Ok(())
+}
+
+pub async fn get_product_by_name(pool: &SqlitePool, name: &str) -> Result<Option<i64>, DBError> {
+    let result = sqlx::query("SELECT id FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1")
+        .bind(name)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to query product by name: {}", e);
+            DBError::Query
+        })?;
+
+    Ok(result.map(|row| row.get("id")))
+}
+
+pub async fn search_ean_variant(pool: &SqlitePool, retailer: &str, raw_ocr_name: &str) -> Result<Option<String>, DBError> {
+    let result = sqlx::query("SELECT ean FROM ean_ocr_variants WHERE retailer = ? AND raw_ocr_name = ? LIMIT 1")
+        .bind(retailer)
+        .bind(raw_ocr_name)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to query ean variants: {}", e);
+            DBError::Query
+        })?;
+
+    Ok(result.map(|row| row.get("ean")))
 }

@@ -13,7 +13,7 @@ use crate::ocr;
 use crate::db::save_receipt;
 
 pub async fn upload_receipt(
-    State(state): State<Arc<AppState>>, 
+    State(state): State<Arc<AppState>>,
     body_bytes: Bytes
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
 
@@ -25,7 +25,7 @@ pub async fn upload_receipt(
         }
     };
 
-    if save_receipt(&state.db, &receipt).await.is_err() {
+    if save_receipt(&state.user_db, &receipt).await.is_err() {
         error!("Failed to save receipt to database");
 
         return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to persist data".into()));

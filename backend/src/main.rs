@@ -23,17 +23,16 @@ use sqlx::SqlitePool;
 
 use crate::config::BonsaiOptions;
 
-/* Global config state */
 pub struct AppState {
     pub config: config::BonsaiOptions,
-    pub db: SqlitePool,
+    pub user_db: SqlitePool,
+    pub ean_db: SqlitePool,
 }
 
 #[tokio::main]
 async fn main() {
     let options = BonsaiOptions::load();
 
-    /* Fetch certificate files from config */
     let cert_path = options.tls.cert_path.clone();
     let key_path = options.tls.key_path.clone();
 
@@ -41,7 +40,7 @@ async fn main() {
         eprintln!("Error while initializing logger: {}", e);
     }
 
-    let pool = match db::establish_database_connection(&options).await {
+    let pools = match db::establish_database_connections(&options).await {
         Ok(p) => p,
         Err(_) => {
             error!("Database could not be initialized. Exiting.");
@@ -49,13 +48,12 @@ async fn main() {
         }
     };
 
-    /* Thread-safe state using Arc<> */
     let shared_state = Arc::new(AppState {
         config: options,
-        db: pool,
+        user_db: pools.user_db,
+        ean_db: pools.ean_db,
     });
 
-    /* FIXME: Testing only */
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -64,10 +62,8 @@ async fn main() {
     let app = Router::new()
         .route("/api/upload-receipt", post(api::handlers::upload_receipt))
         .layer(cors)
-        /* TODO: Frontend will preprocess images before upload in future releases to shrink file size */
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);
-
 
     let tls_config = match RustlsConfig::from_pem_file(&cert_path, &key_path).await {
         Ok(config) => config,
@@ -79,7 +75,6 @@ async fn main() {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
 
-    /* FIXME: Testing only */
     info!("bonsai backend runs on 'https://{}'", addr);
 
     match axum_server::bind_rustls(addr, tls_config)

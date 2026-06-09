@@ -41,8 +41,10 @@ pub struct LoggingOptions {
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct DatabaseOptions {
-    pub url: String,
-    pub max_pool_connections: u32,
+    pub user_db_url: String,
+    pub user_db_max_pool_connections: u32,
+    pub ean_db_url: String,
+    pub ean_db_max_pool_connections: u32,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -73,8 +75,10 @@ impl Default for BonsaiOptions {
                 level: "info".to_string(),
             },
             database: DatabaseOptions {
-                url: "sqlite://sqlite.db".to_string(),
-                max_pool_connections: 5,
+                user_db_url: "sqlite://db/user.db".to_string(),
+                user_db_max_pool_connections: 5,
+                ean_db_url: "sqlite://db/ean.db".to_string(),
+                ean_db_max_pool_connections: 5,
             },
             tls: TlsOptions { 
                 cert_path: "certs/server.crt".to_string(),
