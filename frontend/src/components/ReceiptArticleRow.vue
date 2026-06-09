@@ -16,15 +16,12 @@ const emit = defineEmits([
   'rename', 'manuallyEnterEan', 'startEanScanner', 'updateField'
 ])
 
-// Validierungs-Feedback-Texte für das UI
 const nameValidationMsg = ref('✨ Format optimiert')
 const brandValidationMsg = ref('✨ Format optimiert')
 
-// Der strikte Regex-Filter für erlaubte Zeichen (inkl. %)
 const ALLOWED_NAME_REGEX = /[^A-Z0-9 \-&.,%]/g;
 const ALLOWED_BRAND_REGEX = /[^A-Z0-9 \-&%]/g;
 
-// Sanitäre Live-Formatierung für Namen und Brands
 const handleLiveSanitize = (field, originalValue) => {
   let transformed = originalValue
     .toUpperCase()

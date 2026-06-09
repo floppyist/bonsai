@@ -111,7 +111,6 @@ const addNewArticle = () => {
   activeEditIndex.value = articles.value.length - 1
 }
 
-// Computeds für Validierungen
 const totalAmount = computed(() => articles.value.reduce((sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0))
 const scannedTotalAmount = computed(() => Number(props.receiptData?.total_amount?.value ?? props.receiptData?.total_amount ?? null))
 const hasAmountMismatch = computed(() => scannedTotalAmount.value !== null && totalAmount.value.toFixed(2) !== scannedTotalAmount.value.toFixed(2))
