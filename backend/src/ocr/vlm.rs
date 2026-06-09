@@ -23,25 +23,22 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
         - LIDL:  [name] [unit_p] x [qty] [total_p]     (Qty RIGHT of item)\n\n\
         [Output_Schema]:\n\
         {\n\
-        \"retailer\": { \"value\": string, \"confidence\": \"high\"|\"medium\"|\"low\" },\n\
-        \"date\": { \"value\": \"YYYY-MM-DD\"|null, \"confidence\": \"high\"|\"medium\"|\"low\" },\n\
+        \"retailer\": { \"value\": string },\n\
+        \"date\": { \"value\": \"YYYY-MM-DD\"|null },\n\
         \"articles\": [\n\
-        { \"name\": string, \"quantity\": int, \"price_unit\": float, \"price_total\": float, \"confidence\": \"high\"|\"medium\"|\"low\" }\n\
+        { \"name\": string, \"quantity\": int, \"price_unit\": float, \"price_total\": float }\n\
         ],\n\
-        \"total_amount\": { \"value\": float, \"confidence\": \"high\"|\"medium\"|\"low\" },\n\
-        \"global_confidence\": \"high\"|\"medium\"|\"low\"\n\
+        \"total_amount\": { \"value\": float }\n\
         }";
 
     let request_body = OllamaRequest {
         model: model.to_string(),
         messages: vec![
-            /* Define basic vlm role */
             OllamaMessage {
                 role: "system".to_string(),
                 content: "You are a precise OCR parser for receipts. Respond exclusively in the requested JSON format without any extra markdown wrapper or text.".to_string(),
                 images: None,
             },
-            /* Push prompt */
             OllamaMessage {
                 role: "user".to_string(),
                 content: prompt.to_string(),

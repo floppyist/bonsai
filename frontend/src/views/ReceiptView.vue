@@ -23,6 +23,34 @@ const editedStore = ref('')
 const editedDate = ref('')
 const articles = ref([])
 
+const categoriesList = [
+  { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
+  { value: 'DAIRY_EGGS', label: '🥛 Milchprodukte & Eier' },
+  { value: 'FRUIT_VEGETABLES', label: '🥦 Obst & Gemüse' },
+  { value: 'MEAT_FISH', label: '🥩 Fleisch, Fisch & Ersatz' },
+  { value: 'STAPLE_FOODS', label: '🍝 Grundnahrungsmittel' },
+  { value: 'CANNED_JARRED', label: '🥫 Konserven & Gläser' },
+  { value: 'OILS_SAUCES_SPICES', label: '🫚 Öle, Saucen & Gewürze' },
+  { value: 'BREAKFAST_SPREADS', label: '🍯 Frühstück & Aufstriche' },
+  { value: 'SNACKS_SWEETS', label: '🍫 Süßwaren & Knabberzeug' },
+  { value: 'BEVERAGES', label: '☕ Getränke' },
+  { value: 'DRUGSTORE_BEAUTY', label: '🧴 Drogerie & Kosmetik' },
+  { value: 'HOUSEHOLD_CLEANING', label: '🧹 Haushalt & Reinigung' },
+  { value: 'PET_SUPPLIES', label: '🐾 Haustierbedarf' },
+  { value: 'ELECTRONICS', label: '🔌 Elektronik & Zubehör' },
+  { value: 'STATIONERY_OFFICE', label: '✏️ Schreibwaren & Büro' },
+  { value: 'HOME_LIVING', label: '🍳 Wohnen & Küche' },
+  { value: 'CLOTHING_TEXTILES', label: '🧦 Kleidung & Textilien' },
+  { value: 'DIY_GARDEN', label: '🛠️ Baumarkt & Garten' },
+  { value: 'BOOKS_MEDIA', label: '📚 Medien & Freizeit' },
+  { value: 'UNCATEGORIZED', label: '❓ Unkategorisiert' }
+]
+
+const getCategoryLabel = (value) => {
+  const cat = categoriesList.find(c => c.value === value)
+  return cat ? cat.label : '❓ Unkategorisiert'
+}
+
 const parseIncomingData = (data) => {
   if (!data) return
 
@@ -52,7 +80,9 @@ const parseIncomingData = (data) => {
         price: extractedPrice,
         quantity: item.quantity || 1,
         name: item.name || 'Unbekannter Artikel',
-        ean: item.ean || null
+        ean: item.ean || null,
+        category: item.category || 'UNCATEGORIZED',
+        brand: item.brand || 'UNKNOWN'
       }
     })
   } else {
@@ -66,9 +96,39 @@ watch(() => props.receiptData, (newData) => {
   parseIncomingData(newData)
 }, { deep: true })
 
-const updateEan = (index, newEan) => {
-  if (articles.value[index]) {
-    articles.value[index].ean = newEan
+const updateEan = async (index, newEan) => {
+  if (!articles.value[index]) return
+
+  articles.value[index].ean = newEan
+
+  try {
+    const response = await fetch(`/api/ean/${newEan}`)
+
+    if (response.status === 404) {
+      console.log(`EAN ${newEan} ist unbekannt. Kann manuell benannt werden.`);
+      return
+    }
+
+    if (!response.ok) {
+      console.error(`Server antwortete mit Status: ${response.status}`);
+      return
+    }
+
+    const data = await response.json()
+
+    if (data.found && data.name) {
+      articles.value[index].name = data.name
+      if (data.category) {
+        articles.value[index].category = data.category
+      }
+      if (data.brand) {
+        articles.value[index].brand = data.brand
+      }
+    } else {
+      console.log("Produkt nicht in globaler EAN-Datenbank hinterlegt.");
+    }
+  } catch (error) {
+    console.error('Netzwerkfehler beim EAN-Abgleich:', error)
   }
 }
 
@@ -76,7 +136,15 @@ defineExpose({
   updateEan
 })
 
-const commonStores = ['Edeka', 'REWE', 'Aldi', 'Lidl', 'Kaufland', 'Bio-Markt', 'Netto', 'Penny']
+const commonStores = [
+  'REWE', 'Edeka', 'Kaufland', 'Globus', 'hit', 'Tegut',
+  'Aldi Süd', 'Aldi Nord', 'Lidl', 'Netto', 'Penny', 'Norma',
+  'dm', 'Rossmann', 'Müller', 'Denns BioMarkt', 'Alnatura', 'Bio-Markt',
+  'OBI', 'Bauhaus', 'Hornbach', 'Toom', 'Toom Baumarkt',
+  'MediaMarkt', 'Saturn', 'Thalia',
+  'Action', 'TEDi', 'Decathlon', 'IKEA'
+].sort((a, b) => a.localeCompare(b, 'de'))
+
 const showStoreDropdown = ref(false)
 
 const selectStore = (name) => {
@@ -112,7 +180,9 @@ const addNewArticle = () => {
     name: 'Neuer Artikel',
     quantity: 1,
     price: 1.00,
-    ean: null
+    ean: null,
+    category: 'UNCATEGORIZED',
+    brand: 'UNKNOWN',
   })
   activeEditIndex.value = articles.value.length - 1
 }
@@ -134,8 +204,8 @@ const isMissingEan = computed(() => {
 
 const hasDuplicateEan = computed(() => {
   const eans = articles.value
-    .map(item => item.ean)
-    .filter(ean => ean !== null && ean !== undefined && ean !== '')
+  .map(item => item.ean)
+  .filter(ean => ean !== null && ean !== undefined && ean !== '')
   return new Set(eans).size !== eans.length
 })
 
@@ -169,16 +239,61 @@ const isFormInvalid = computed(() => {
   return isStoreInvalid.value || isDateInvalid.value || isPriceInvalid.value || isMissingEan.value || hasDuplicateEan.value
 })
 
-const handleSave = () => {
-  if (isFormInvalid.value) return
-  const updatedData = {
-    ...props.receiptData,
-    store_name: editedStore.value,
-    date: editedDate.value,
-    articles: articles.value,
-    total_amount: totalAmount.value
+const manuallyEnterEan = (index) => {
+  const currentEan = articles.value[index]?.ean || ''
+  const input = prompt('Bitte EAN-Barcode manuell eingeben:', currentEan)
+
+  if (input !== null) {
+    const cleanedEan = input.trim()
+    if (cleanedEan) {
+      updateEan(index, cleanedEan)
+    }
   }
-  emit('saveAndCloseReceipt', updatedData)
+}
+
+const isSubmitting = ref(false)
+
+const handleSave = async () => {
+  if (isFormInvalid.value) return
+
+  isSubmitting.value = true
+
+  const payload = {
+    retailer: editedStore.value || 'Unbekannter Händler',
+    receipt_date: editedDate.value || new Date().toISOString().split('T')[0],
+    total_amount: Number(totalAmount.value.toFixed(2)),
+    articles: articles.value.map(item => ({
+      name: item.name,
+      quantity: parseFloat(item.quantity) || 1.0,
+      price: parseFloat(item.price) || 0.0,
+      ean: item.ean || null,
+      category: item.category || 'UNCATEGORIZED',
+      brand: item.brand || 'UNKNOWN' // <-- NEU ans Backend senden
+    }))
+  };
+
+  try {
+    const response = await fetch('/api/finalize-receipt', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server-Fehler: ${response.status}`)
+    }
+
+    console.log('Kassenbon erfolgreich verbucht!')
+    emit('saveAndCloseReceipt')
+
+  } catch (error) {
+    console.error('Fehler beim Finalisieren des Bons:', error)
+    alert('Speichern fehlgeschlagen: ' + error.message)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -256,24 +371,50 @@ const handleSave = () => {
             'rounded-xl transition-all border duration-200',
             activeEditIndex === index
               ? (isDuplicateArticle(item)
-                  ? 'bg-amber-50/60 border-amber-500/40 p-4 space-y-3.5 shadow-sm'
-                  : 'bg-[#F4F7F5] border-[#2D6A4F]/20 p-4 space-y-3.5')
+                ? 'bg-amber-50/60 border-amber-500/40 p-4 space-y-3.5 shadow-sm'
+                : 'bg-[#F4F7F5] border-[#2D6A4F]/20 p-4 space-y-3.5')
               : (isDuplicateArticle(item)
-                  ? 'bg-amber-50/40 border-amber-500/25 hover:bg-amber-50/70 p-3 flex items-center justify-between gap-3 text-amber-950'
-                  : (item.ean
-                      ? 'bg-[#EAF5ED]/60 border-[#2D6A4F]/15 hover:bg-[#EAF5ED]/90 p-3 flex items-center justify-between gap-3'
-                      : 'bg-white hover:bg-[#F4F7F5]/30 border-zinc-100 p-3 flex items-center justify-between gap-3'
-                    )
+                ? 'bg-amber-50/40 border-amber-500/25 hover:bg-amber-50/70 p-3 flex items-center justify-between gap-3 text-amber-950'
+                : (item.ean
+                  ? 'bg-[#EAF5ED]/60 border-[#2D6A4F]/15 hover:bg-[#EAF5ED]/90 p-3 flex items-center justify-between gap-3'
+                  : 'bg-white hover:bg-[#F4F7F5]/30 border-zinc-100 p-3 flex items-center justify-between gap-3'
                 )
+              )
           ]"
         >
           <template v-if="activeEditIndex === index">
             <div class="flex justify-between items-start gap-2">
-              <div class="flex-1 space-y-1.5">
-                <input
-                  v-model="item.name"
-                  class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
-                />
+              <div class="flex-1 space-y-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Artikelbezeichnung</label>
+                    <input
+                      v-model="item.name"
+                      class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Marke / Hersteller / Autor</label>
+                    <input
+                      v-model="item.brand"
+                      placeholder="z.B. Eigenmarke, Alnatura, Autor..."
+                      class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Kategorie</label>
+                  <select
+                    v-model="item.category"
+                    class="w-full bg-white border border-zinc-300 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none focus:border-[#2D6A4F] text-[#2D3A34] min-h-[38px] cursor-pointer"
+                  >
+                    <option v-for="cat in categoriesList" :key="cat.value" :value="cat.value">
+                      {{ cat.label }}
+                    </option>
+                  </select>
+                </div>
+
                 <div v-if="item.ean" :class="['text-[10px] font-mono font-bold px-1', isDuplicateArticle(item) ? 'text-amber-700' : 'text-[#2D6A4F]']">
                   EAN: {{ item.ean }} <span v-if="isDuplicateArticle(item)">(Duplikat!)</span>
                 </div>
@@ -298,20 +439,31 @@ const handleSave = () => {
                   <button @click="updateQuantity(index, 1)" class="px-4 text-zinc-500 font-bold hover:bg-zinc-100 text-sm h-full w-12 flex items-center justify-center border-l border-zinc-100">+</button>
                 </div>
 
-                <button
-                  @click="emit('startEanScanner', index)"
-                  :class="[
-                    'text-xs font-bold px-4 py-2 rounded-xl border transition-colors cursor-pointer h-10 flex items-center shadow-sm',
-                    isDuplicateArticle(item)
-                      ? 'bg-amber-100 border-amber-400 text-amber-800 hover:bg-amber-200'
-                      : (item.ean
+                <div class="flex items-center gap-1.5">
+                  <button
+                    @click="manuallyEnterEan(index)"
+                    class="text-xs font-bold px-3 py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 h-10 flex items-center shadow-sm cursor-pointer"
+                    title="EAN manuell eintippen"
+                  >
+                    ⌨️ Manuell
+                  </button>
+
+                  <button
+                    @click="emit('startEanScanner', index)"
+                    :class="[
+                      'text-xs font-bold px-4 py-2 rounded-xl border transition-colors cursor-pointer h-10 flex items-center shadow-sm',
+                      isDuplicateArticle(item)
+                        ? 'bg-amber-100 border-amber-400 text-amber-800 hover:bg-amber-200'
+                        : (item.ean
                           ? 'bg-[#EAF5ED] border-[#2D6A4F]/30 text-[#2D6A4F] hover:bg-[#D8F3DC]'
                           : 'bg-[#D8F3DC] border-[#74C69D] text-[#1B4332] animate-pulse'
                         )
-                  ]"
-                >
-                  {{ item.ean ? '✓ EAN erneut scannen' : 'EAN Scan' }}
-                </button>
+                    ]"
+                  >
+                    {{ item.ean ? '✓ EAN erneut scannen' : 'EAN Scan' }}
+                  </button>
+                </div>
+
               </div>
 
               <div class="bg-white border border-zinc-200 rounded-xl p-3 flex flex-col gap-2.5 shadow-sm">
@@ -354,7 +506,7 @@ const handleSave = () => {
                   @click="toggleEditRow(index)"
                   class="bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-bold text-xs py-3 rounded-xl transition-colors border border-zinc-300/40 cursor-pointer flex items-center justify-center min-h-[46px]"
                 >
-                  Verwerfen
+                  Abbrechen
                 </button>
               </div>
             </div>
@@ -362,23 +514,39 @@ const handleSave = () => {
 
           <template v-if="activeEditIndex !== index">
             <div @click="toggleEditRow(index)" class="flex-1 min-w-0 cursor-pointer py-1">
-              <div class="text-xs font-bold text-[#2D3A34] truncate flex items-center gap-2">
+              <div class="text-xs font-bold text-[#2D3A34] truncate flex items-center gap-1.5 flex-wrap">
                 <span>{{ item.name }}</span>
+                <span v-if="item.brand && item.brand !== 'UNKNOWN'" class="text-[10px] text-[#6B7C74] font-medium bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200/30">
+                  {{ item.brand }}
+                </span>
                 <span v-if="!item.ean" class="w-1.5 h-1.5 rounded-full bg-amber-500" title="EAN fehlt"></span>
                 <span v-else-if="isDuplicateArticle(item)" class="w-2 h-2 rounded-full bg-red-500 animate-ping" title="EAN doppelt"></span>
               </div>
-              <div :class="['text-[10px] font-medium mt-0.5', isDuplicateArticle(item) ? 'text-amber-800' : 'text-[#6B7C74]']">
-                {{ item.quantity || 1 }}x · {{ Number(item.price).toFixed(2) }} €
-                <span v-if="item.ean" :class="['ml-1 font-mono font-bold', isDuplicateArticle(item) ? 'text-red-700' : 'text-[#2D6A4F]']">
+              <div :class="['text-[10px] font-medium mt-0.5 flex flex-wrap items-center gap-1.5', isDuplicateArticle(item) ? 'text-amber-800' : 'text-[#6B7C74]']">
+                <span>{{ item.quantity || 1 }}x · {{ Number(item.price).toFixed(2) }} €</span>
+
+                <span class="bg-[#F4F7F5] text-[#2D6A4F] px-1.5 py-0.5 rounded text-[9px] font-bold border border-zinc-200/30">
+                  {{ getCategoryLabel(item.category) }}
+                </span>
+
+                <span v-if="item.ean" :class="['font-mono font-bold', isDuplicateArticle(item) ? 'text-red-700' : 'text-[#2D6A4F]']">
                   | EAN: {{ item.ean }} {{ isDuplicateArticle(item) ? '(Doppelt)' : '' }}
                 </span>
               </div>
             </div>
 
-            <div class="flex items-center gap-3 shrink-0">
+            <div class="flex items-center gap-1.5 shrink-0">
               <span class="text-xs font-mono font-bold text-[#2D3A34] px-1">
                 {{ formatPrice(Number(item.price || 0) * (item.quantity || 1)) }}
               </span>
+
+              <button
+                @click="manuallyEnterEan(index)"
+                class="text-xs font-bold px-2.5 py-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 min-h-[40px] flex items-center shadow-sm cursor-pointer"
+                title="EAN manuell eintippen"
+              >
+                ⌨️
+              </button>
 
               <button
                 @click="emit('startEanScanner', index)"
@@ -387,9 +555,9 @@ const handleSave = () => {
                   isDuplicateArticle(item)
                     ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
                     : (item.ean
-                        ? 'bg-[#EAF5ED] hover:bg-[#D8F3DC] text-[#2D6A4F] border-[#2D6A4F]/20'
-                        : 'bg-[#D8F3DC] hover:bg-[#b7e4c7] text-[#1B4332] border-[#74C69D]'
-                      )
+                      ? 'bg-[#EAF5ED] hover:bg-[#D8F3DC] text-[#2D6A4F] border-[#2D6A4F]/20'
+                      : 'bg-[#D8F3DC] hover:bg-[#b7e4c7] text-[#1B4332] border-[#74C69D]'
+                    )
                 ]"
               >
                 {{ item.ean ? (isDuplicateArticle(item) ? 'EAN korrigieren' : 'EAN ändern') : 'EAN Scan' }}
@@ -450,15 +618,16 @@ const handleSave = () => {
 
       <button
         @click="handleSave"
-        :disabled="isFormInvalid"
+        :disabled="isFormInvalid || isSubmitting"
         :class="[
           'w-full font-bold py-4 px-4 rounded-xl text-sm shadow-lg transition-all duration-200 min-h-[48px]',
-          isFormInvalid
+          (isFormInvalid || isSubmitting)
             ? 'bg-zinc-700/50 text-zinc-400 border border-zinc-600/30 cursor-not-allowed opacity-60'
             : 'bg-[#CCFF33] hover:bg-[#b2eb2a] text-zinc-900 cursor-pointer active:scale-[0.99]'
         ]"
       >
-        <template v-if="isMissingEan">Bitte erst alle Barcodes scannen</template>
+        <template v-if="isSubmitting">Wird gespeichert...</template>
+        <template v-else-if="isMissingEan">Bitte erst alle Barcodes scannen</template>
         <template v-else-if="hasDuplicateEan">Doppelte Barcodes korrigieren</template>
         <template v-else-if="isPriceInvalid">Preis/Summe darf nicht 0 € sein</template>
         <template v-else-if="isStoreInvalid">Händler-Namen korrigieren</template>

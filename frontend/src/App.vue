@@ -26,6 +26,8 @@ let codeReaderControls = null
 const isDevMode = ref(false)
 provide('isDevMode', isDevMode)
 
+const receiptViewRef = ref(null)
+
 const pantryItems = ref([
   { id: 1, name: 'Frische Bio-Avocado', category: 'Gemüse & Früchte', emoji: '🥑', stock: 90, stockColor: '#52B788', daysLeft: '3 Tage', status: 'urgent' },
   { id: 2, name: 'Hafermilch (Barista)', category: 'Getränke', emoji: '🥛', stock: 40, stockColor: '#D8F3DC', daysLeft: '12 Tage', status: 'good' },
@@ -148,12 +150,22 @@ const initializeQrScanner = async (videoElement) => {
       videoElement,
       (result, err) => {
         if (result) {
-          receiptData.value.articles[currentTargetEanIndex.value].ean = result.getText();
+          const scannedEan = result.getText();
+
+          if (!scannedEan) return;
+
+          const activeIndex = currentTargetEanIndex.value;
+
           stopEanScanner();
+
+          if (receiptViewRef.value && typeof receiptViewRef.value.updateEan === 'function') {
+            receiptViewRef.value.updateEan(activeIndex, scannedEan);
+          } else {
+            receiptData.value.articles[activeIndex].ean = scannedEan;
+          }
         }
       }
     );
-
   } catch (err) {
     console.error("Kamera-Setup fehlgeschlagen:", err);
     alert(`Fehler beim Starten der Kamera: ${err.message}`);
@@ -171,19 +183,22 @@ const stopEanScanner = () => {
     codeReaderControls = null;
   }
 
+  if (codeReaderInstance) {
+    try {
+      codeReaderInstance.reset();
+    } catch (e) {
+      console.warn("ZXing reset fehler:", e);
+    }
+    codeReaderInstance = null;
+  }
+
   const videoElement = document.querySelector('video');
   if (videoElement && videoElement.srcObject) {
     const stream = videoElement.srcObject;
     const tracks = stream.getTracks();
-
-    tracks.forEach(track => {
-      track.stop();
-    });
-
+    tracks.forEach(track => track.stop());
     videoElement.srcObject = null;
   }
-
-  codeReaderInstance = null;
 };
 
 const saveAndCloseReceipt = () => {
@@ -197,15 +212,15 @@ const saveAndCloseReceipt = () => {
     <div class="relative w-full h-full bg-[#F4F7F5] shadow-2xl flex flex-col overflow-hidden">
 
       <PantryHeader
-  :isProcessingInBackground="isProcessingInBackground"
-  @bringOverlayToForeground="showOverlay = true"
-/>
+        :isProcessingInBackground="isProcessingInBackground"
+        @bringOverlayToForeground="showOverlay = true"
+      />
 
       <main class="flex-1 overflow-y-auto p-5 pb-28 scrollbar-thin scrollbar-thumb-zinc-300">
         <router-view v-slot="{ Component }">
           <component
             :is="Component"
-            :pantryItems="pantryItems"
+            ref="receiptViewRef" :pantryItems="pantryItems"
             :receiptData="receiptData"
             :formatPrice="formatPrice"
             @startEanScanner="startEanScanner"
@@ -232,13 +247,13 @@ const saveAndCloseReceipt = () => {
 
 <style>
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+from { opacity: 0; transform: translateY(8px); }
+to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scanLine {
-  0% { top: 0%; opacity: 0.3; }
-  50% { top: 100%; opacity: 1; }
-  100% { top: 0%; opacity: 0.3; }
+0% { top: 0%; opacity: 0.3; }
+50% { top: 100%; opacity: 1; }
+100% { top: 0%; opacity: 0.3; }
 }
 </style>

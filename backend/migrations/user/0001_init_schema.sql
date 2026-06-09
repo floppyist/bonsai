@@ -1,0 +1,31 @@
+-- user.db
+
+CREATE TABLE IF NOT EXISTS receipts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    retailer TEXT NOT NULL,
+    receipt_date TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    ean TEXT DEFAULT NULL,
+    category TEXT NOT NULL DEFAULT 'UNCATEGORIZED',
+    brand TEXT NOT NULL DEFAULT 'UNKNOWN',
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS receipt_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    receipt_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    price INTEGER NOT NULL,
+    quantity REAL NOT NULL DEFAULT 1.0,
+    FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_receipts_date ON receipts (receipt_date);
+CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt ON receipt_items (receipt_id);

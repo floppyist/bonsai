@@ -15,18 +15,9 @@ use opencv::imgcodecs;
 
 use crate::config::BonsaiOptions;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum Confidence {
-    High,
-    Medium,
-    Low,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Field<T> {
     pub value: T,
-    pub confidence: Confidence,
 }
 
 fn deserialize_flexible_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
@@ -58,13 +49,11 @@ where
     struct RawField {
         #[serde(deserialize_with = "deserialize_flexible_f64")]
         value: f64,
-        confidence: Confidence,
     }
 
     let raw = RawField::deserialize(deserializer)?;
     Ok(Field {
         value: raw.value,
-        confidence: raw.confidence,
     })
 }
 
@@ -76,7 +65,6 @@ pub struct Article {
     pub price_unit: f64,
     #[serde(deserialize_with = "deserialize_flexible_f64")]
     pub price_total: f64,
-    pub confidence: Confidence,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -86,7 +74,6 @@ pub struct Receipt {
     pub articles: Vec<Article>,
     #[serde(deserialize_with = "deserialize_field_f64")]
     pub total_amount: Field<f64>,
-    pub global_confidence: Confidence,
 }
 
 #[derive(Serialize)]

@@ -43,9 +43,13 @@ export default defineConfig({
       key: fs.readFileSync(keyPath),
       cert: fs.readFileSync(certPath),
     },
+    hmr: {
+      host: 'bonsai.pi',
+      protocol: 'wss',
+    },
     proxy: {
       '/api': {
-        target: 'http://bonsai.pi:3000',
+        target: 'https://bonsai.pi:3000',
         changeOrigin: true,
         secure: false
       }
