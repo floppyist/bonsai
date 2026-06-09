@@ -66,9 +66,34 @@ watch(() => props.receiptData, (newData) => {
   parseIncomingData(newData)
 }, { deep: true })
 
-const updateEan = (index, newEan) => {
-  if (articles.value[index]) {
-    articles.value[index].ean = newEan
+const updateEan = async (index, newEan) => {
+  if (!articles.value[index]) return
+
+  // 1. EAN im UI-State setzen, damit die Warnung weggeht
+  articles.value[index].ean = newEan
+
+  try {
+    const response = await fetch(`/api/ean/${newEan}`)
+
+    if (response.status === 404) {
+      console.log(`EAN ${newEan} ist unbekannt. Kann manuell benannt werden.`);
+      return
+    }
+
+    if (!response.ok) {
+      console.error(`Server antwortete mit Status: ${response.status}`);
+      return
+    }
+
+    const data = await response.json()
+
+    if (data.found && data.name) {
+      articles.value[index].name = data.name
+    } else {
+      console.log("Produkt nicht in globaler EAN-Datenbank hinterlegt.");
+    }
+  } catch (error) {
+    console.error('Netzwerkfehler beim EAN-Abgleich:', error)
   }
 }
 
@@ -134,8 +159,8 @@ const isMissingEan = computed(() => {
 
 const hasDuplicateEan = computed(() => {
   const eans = articles.value
-    .map(item => item.ean)
-    .filter(ean => ean !== null && ean !== undefined && ean !== '')
+  .map(item => item.ean)
+  .filter(ean => ean !== null && ean !== undefined && ean !== '')
   return new Set(eans).size !== eans.length
 })
 
@@ -171,14 +196,34 @@ const isFormInvalid = computed(() => {
 
 const handleSave = () => {
   if (isFormInvalid.value) return
+
   const updatedData = {
     ...props.receiptData,
     store_name: editedStore.value,
     date: editedDate.value,
-    articles: articles.value,
-    total_amount: totalAmount.value
+    articles: articles.value.map(item => ({
+      name: item.name,
+      quantity: Number(item.quantity),
+      price_unit: Number(item.price),
+      price_total: Number((Number(item.price) * Number(item.quantity)).toFixed(2)),
+      ean: item.ean
+    })),
+    total_amount: Number(totalAmount.value.toFixed(2))
   }
+
   emit('saveAndCloseReceipt', updatedData)
+}
+
+const manuallyEnterEan = (index) => {
+  const currentEan = articles.value[index]?.ean || ''
+  const input = prompt('Bitte EAN-Barcode manuell eingeben:', currentEan)
+
+  if (input !== null) {
+    const cleanedEan = input.trim()
+    if (cleanedEan) {
+      updateEan(index, cleanedEan)
+    }
+  }
 }
 </script>
 
@@ -256,15 +301,15 @@ const handleSave = () => {
             'rounded-xl transition-all border duration-200',
             activeEditIndex === index
               ? (isDuplicateArticle(item)
-                  ? 'bg-amber-50/60 border-amber-500/40 p-4 space-y-3.5 shadow-sm'
-                  : 'bg-[#F4F7F5] border-[#2D6A4F]/20 p-4 space-y-3.5')
+                ? 'bg-amber-50/60 border-amber-500/40 p-4 space-y-3.5 shadow-sm'
+                : 'bg-[#F4F7F5] border-[#2D6A4F]/20 p-4 space-y-3.5')
               : (isDuplicateArticle(item)
-                  ? 'bg-amber-50/40 border-amber-500/25 hover:bg-amber-50/70 p-3 flex items-center justify-between gap-3 text-amber-950'
-                  : (item.ean
-                      ? 'bg-[#EAF5ED]/60 border-[#2D6A4F]/15 hover:bg-[#EAF5ED]/90 p-3 flex items-center justify-between gap-3'
-                      : 'bg-white hover:bg-[#F4F7F5]/30 border-zinc-100 p-3 flex items-center justify-between gap-3'
-                    )
+                ? 'bg-amber-50/40 border-amber-500/25 hover:bg-amber-50/70 p-3 flex items-center justify-between gap-3 text-amber-950'
+                : (item.ean
+                  ? 'bg-[#EAF5ED]/60 border-[#2D6A4F]/15 hover:bg-[#EAF5ED]/90 p-3 flex items-center justify-between gap-3'
+                  : 'bg-white hover:bg-[#F4F7F5]/30 border-zinc-100 p-3 flex items-center justify-between gap-3'
                 )
+              )
           ]"
         >
           <template v-if="activeEditIndex === index">
@@ -298,20 +343,31 @@ const handleSave = () => {
                   <button @click="updateQuantity(index, 1)" class="px-4 text-zinc-500 font-bold hover:bg-zinc-100 text-sm h-full w-12 flex items-center justify-center border-l border-zinc-100">+</button>
                 </div>
 
-                <button
-                  @click="emit('startEanScanner', index)"
-                  :class="[
-                    'text-xs font-bold px-4 py-2 rounded-xl border transition-colors cursor-pointer h-10 flex items-center shadow-sm',
-                    isDuplicateArticle(item)
-                      ? 'bg-amber-100 border-amber-400 text-amber-800 hover:bg-amber-200'
-                      : (item.ean
+                <div class="flex items-center gap-1.5">
+                  <button
+                    @click="manuallyEnterEan(index)"
+                    class="text-xs font-bold px-3 py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 h-10 flex items-center shadow-sm cursor-pointer"
+                    title="EAN manuell eintippen"
+                  >
+                    ⌨️ Manuell
+                  </button>
+
+                  <button
+                    @click="emit('startEanScanner', index)"
+                    :class="[
+                      'text-xs font-bold px-4 py-2 rounded-xl border transition-colors cursor-pointer h-10 flex items-center shadow-sm',
+                      isDuplicateArticle(item)
+                        ? 'bg-amber-100 border-amber-400 text-amber-800 hover:bg-amber-200'
+                        : (item.ean
                           ? 'bg-[#EAF5ED] border-[#2D6A4F]/30 text-[#2D6A4F] hover:bg-[#D8F3DC]'
                           : 'bg-[#D8F3DC] border-[#74C69D] text-[#1B4332] animate-pulse'
                         )
-                  ]"
-                >
-                  {{ item.ean ? '✓ EAN erneut scannen' : 'EAN Scan' }}
-                </button>
+                    ]"
+                  >
+                    {{ item.ean ? '✓ EAN erneut scannen' : 'EAN Scan' }}
+                  </button>
+                </div>
+
               </div>
 
               <div class="bg-white border border-zinc-200 rounded-xl p-3 flex flex-col gap-2.5 shadow-sm">
@@ -375,10 +431,18 @@ const handleSave = () => {
               </div>
             </div>
 
-            <div class="flex items-center gap-3 shrink-0">
+            <div class="flex items-center gap-1.5 shrink-0">
               <span class="text-xs font-mono font-bold text-[#2D3A34] px-1">
                 {{ formatPrice(Number(item.price || 0) * (item.quantity || 1)) }}
               </span>
+
+              <button
+                @click="manuallyEnterEan(index)"
+                class="text-xs font-bold px-2.5 py-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 min-h-[40px] flex items-center shadow-sm cursor-pointer"
+                title="EAN manuell eintippen"
+              >
+                ⌨️
+              </button>
 
               <button
                 @click="emit('startEanScanner', index)"
@@ -387,9 +451,9 @@ const handleSave = () => {
                   isDuplicateArticle(item)
                     ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
                     : (item.ean
-                        ? 'bg-[#EAF5ED] hover:bg-[#D8F3DC] text-[#2D6A4F] border-[#2D6A4F]/20'
-                        : 'bg-[#D8F3DC] hover:bg-[#b7e4c7] text-[#1B4332] border-[#74C69D]'
-                      )
+                      ? 'bg-[#EAF5ED] hover:bg-[#D8F3DC] text-[#2D6A4F] border-[#2D6A4F]/20'
+                      : 'bg-[#D8F3DC] hover:bg-[#b7e4c7] text-[#1B4332] border-[#74C69D]'
+                    )
                 ]"
               >
                 {{ item.ean ? (isDuplicateArticle(item) ? 'EAN korrigieren' : 'EAN ändern') : 'EAN Scan' }}

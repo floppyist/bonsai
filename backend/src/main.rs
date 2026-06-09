@@ -4,6 +4,7 @@ mod ocr;
 mod db;
 mod api;
 
+use axum::routing::get;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
@@ -61,6 +62,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/upload-receipt", post(api::handlers::upload_receipt))
+        .route("/api/ean/{ean}", get(api::handlers::lookup_ean))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);
