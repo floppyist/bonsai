@@ -20,12 +20,29 @@ export const useBonsaiStore = defineStore('bonsai', {
       scannedTotalAmount: null
     },
 
-    pantrySummary: [],
-
+    isLoadingPantry: false,
     isSubmittingReceipt: false,
   }),
 
   getters: {
+    pantrySummary: (state) => {
+      const summaryMap = {}
+
+      state.pantryItems.forEach(item => {
+        if (!summaryMap[item.category]) {
+          summaryMap[item.category] = { total_quantity: 0, total_price: 0 }
+        }
+        summaryMap[item.category].total_quantity += item.quantity
+        summaryMap[item.category].total_price += item.price
+      })
+
+      return Object.keys(summaryMap).map(category => ({
+        category,
+        total_quantity: summaryMap[category].total_quantity,
+        total_price: summaryMap[category].total_price
+      }))
+    },
+
     currentTotalAmount: (state) => {
       return state.currentReceipt.articles.reduce(
         (sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0
@@ -60,6 +77,19 @@ export const useBonsaiStore = defineStore('bonsai', {
   },
 
   actions: {
+    async fetchPantryItems() {
+      this.isLoadingPantry = true
+      try {
+        const response = await fetch('/api/pantry/items')
+        if (!response.ok) return
+        this.pantryItems = await response.json()
+      } catch (error) {
+        console.error('Failed fetching pantry items:', error)
+      } finally {
+        this.isLoadingPantry = false
+      }
+    },
+
     setReceiptData(rawData) {
       if (!rawData) return
 
@@ -111,16 +141,23 @@ export const useBonsaiStore = defineStore('bonsai', {
 
     async lookupEanForArticle(index, ean) {
       if (!this.currentReceipt.articles[index]) return
+
       this.currentReceipt.articles[index].ean = ean
 
       try {
         const response = await fetch(`/api/ean/${ean}`)
         if (!response.ok) return
+
         const data = await response.json()
-        if (data.found && data.name) {
-          this.currentReceipt.articles[index].name = data.name.toUpperCase()
-          if (data.category) this.currentReceipt.articles[index].category = data.category
-          if (data.brand) this.currentReceipt.articles[index].brand = data.brand.toUpperCase()
+
+        if (data && data.name) {
+          this.currentReceipt.articles[index].name = String(data.name).toUpperCase()
+          this.currentReceipt.articles[index].brand = String(data.brand || 'UNKNOWN').toUpperCase()
+          this.currentReceipt.articles[index].category = data.category || 'UNCATEGORIZED'
+
+          if (data.price || data.price_unit) {
+            this.currentReceipt.articles[index].price = Number(data.price || data.price_unit || 0)
+          }
         }
       } catch (error) {
         console.error('EAN Lookup failed:', error)

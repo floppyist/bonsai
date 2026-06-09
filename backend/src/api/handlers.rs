@@ -251,41 +251,41 @@ pub async fn get_pantry_summary(
     Ok(Json(summary))
 }
 
-pub async fn get_pantry_category_details(
+pub async fn get_pantry_items(
     State(state): State<Arc<AppState>>,
-    Path(category): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-
     let rows = sqlx::query(
         "SELECT 
             p.name, 
             p.brand, 
+            p.category,
             SUM(ri.quantity) as quantity, 
             CAST(ri.price AS REAL) / 100.0 as unit_price
          FROM receipt_items ri
          JOIN products p ON ri.product_id = p.id
-         WHERE p.category = ? AND p.is_deleted = 0
-         GROUP BY p.name, p.brand, ri.price"
+         WHERE p.is_deleted = 0
+         GROUP BY p.name, p.brand, p.category, ri.price"
     )
-    .bind(&category)
     .fetch_all(&state.user_db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let mut details = serde_json::json!([]);
+    let mut items = serde_json::json!([]);
     for row in rows {
         let name: String = row.get("name");
         let brand: String = row.get("brand");
+        let category: String = row.get("category");
         let quantity: f64 = row.get("quantity");
         let unit_price: f64 = row.get("unit_price");
 
-        details.as_array_mut().unwrap().push(serde_json::json!({
+        items.as_array_mut().unwrap().push(serde_json::json!({
             "name": name,
             "brand": brand,
+            "category": category,
             "quantity": quantity,
             "price": unit_price * quantity
         }));
     }
 
-    Ok(Json(details))
+    Ok(Json(items))
 }

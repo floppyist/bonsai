@@ -4,7 +4,6 @@ import { useBonsaiStore } from '../stores/BonsaiStore.js'
 
 const store = useBonsaiStore()
 const selectedCategory = ref(null)
-const categoryDetails = ref([])
 
 const categoriesList = [
   { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
@@ -45,20 +44,17 @@ const activeCategories = computed(() => {
   }).filter(cat => cat.totalQuantity > 0)
 })
 
-async function selectCategory(cat) {
+const categoryDetails = computed(() => {
+  if (!selectedCategory.value) return []
+  return store.pantryItems.filter(item => item.category === selectedCategory.value.value)
+})
+
+function selectCategory(cat) {
   selectedCategory.value = cat
-  try {
-    const response = await fetch(`/api/pantry/category/${cat.value}`)
-    if (response.ok) {
-      categoryDetails.value = await response.json()
-    }
-  } catch (error) {
-    console.error(error)
-  }
 }
 
 onMounted(() => {
-  store.fetchPantrySummary()
+  store.fetchPantryItems()
 })
 </script>
 

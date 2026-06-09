@@ -151,18 +151,39 @@ const initializeQrScanner = async (videoElement) => {
       (result, err) => {
         if (result) {
           const scannedEan = result.getText();
-
           if (!scannedEan) return;
 
           const activeIndex = currentTargetEanIndex.value;
 
+          // 1. Schließe die Kamera sofort, um Deadlocks zu vermeiden
           stopEanScanner();
 
-          if (receiptViewRef.value && typeof receiptViewRef.value.updateEan === 'function') {
-            receiptViewRef.value.updateEan(activeIndex, scannedEan);
-          } else {
-            receiptData.value.articles[activeIndex].ean = scannedEan;
-          }
+          // 2. Entkopple die API-Abfrage in den nächsten Event-Loop-Tick
+          setTimeout(() => {
+            if (receiptViewRef.value && typeof receiptViewRef.value.updateEan === 'function') {
+              receiptViewRef.value.updateEan(activeIndex, scannedEan);
+            } else {
+              // Lokale Zuweisung, falls die View-Referenz temporär verloren ging
+              receiptData.value.articles[activeIndex].ean = scannedEan;
+
+              // Hier wird die Backend-Lücke geschlossen:
+              fetch(`https://bonsai.pi:3000/api/ean/${scannedEan}`)
+                .then(response => {
+                  if (!response.ok) throw new Error('EAN nicht im System');
+                  return response.json();
+                })
+                .then(backendData => {
+                  if (backendData) {
+                    if (backendData.name) receiptData.value.articles[activeIndex].name = backendData.name.toUpperCase();
+                    if (backendData.brand) receiptData.value.articles[activeIndex].brand = backendData.brand.toUpperCase();
+                    if (backendData.category) receiptData.value.articles[activeIndex].category = backendData.category;
+                  }
+                })
+                .catch(fetchErr => {
+                  console.warn("EAN nicht im Backend verzeichnet:", fetchErr);
+                });
+            }
+          }, 50);
         }
       }
     );
