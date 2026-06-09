@@ -77,8 +77,6 @@ pub async fn lookup_ean(
     }
 }
 
-
-
 pub async fn finalize_receipt(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<FinalizeReceiptPayload>,
@@ -100,77 +98,90 @@ pub async fn finalize_receipt(
 
     let receipt_id: i64 = receipt_row.get("id");
 
-    for article in payload.articles {
+for article in payload.articles {
         let mut product_id: Option<i64> = None;
+        let mut existing_ean: Option<String> = None;
 
         if let Some(ref ean_code) = article.ean {
             let row = sqlx::query(
-                "SELECT id FROM products WHERE ean = ? AND is_deleted = 0 LIMIT 1"
+                "SELECT id, ean FROM products WHERE ean = ? AND is_deleted = 0 LIMIT 1"
             )
-                .bind(ean_code)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .bind(ean_code)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
             if let Some(r) = row {
                 product_id = Some(r.get("id"));
+                existing_ean = r.get("ean");
             }
         }
 
         if product_id.is_none() {
             let row = sqlx::query(
-                "SELECT id FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
+                "SELECT id, ean FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
             )
-                .bind(&article.name)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .bind(&article.name)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
             if let Some(r) = row {
-                let existing_id: i64 = r.get("id");
-                product_id = Some(existing_id);
-
-                if article.ean.is_some() {
-                    sqlx::query(
-                        "UPDATE products SET ean = ? WHERE id = ?"
-                    )
-                        .bind(&article.ean)
-                        .bind(existing_id)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-                }
+                product_id = Some(r.get("id"));
+                existing_ean = r.get("ean");
             }
         }
 
         let final_product_id = match product_id {
-            Some(id) => id,
+            Some(id) => {
+                // Wenn wir eine neue EAN vom User haben, das Produkt in der DB aber noch keine hat: Update!
+                if existing_ean.is_none() && article.ean.is_some() {
+                    sqlx::query("UPDATE products SET ean = ? WHERE id = ?")
+                        .bind(&article.ean)
+                        .bind(id)
+                        .execute(&mut *tx)
+                        .await
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                }
+                id
+            },
             None => {
                 let new_product_row = sqlx::query(
                     "INSERT INTO products (name, ean) VALUES (?, ?) RETURNING id"
                 )
-                    .bind(&article.name)
-                    .bind(&article.ean)
-                    .fetch_one(&mut *tx)
-                    .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .bind(&article.name)
+                .bind(&article.ean)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
                 new_product_row.get("id")
             }
         };
 
         let price_in_cents = (article.price * 100.0).round() as i64;
-
         sqlx::query(
             "INSERT INTO receipt_items (receipt_id, product_id, price, quantity) VALUES (?, ?, ?, ?)"
         )
-            .bind(receipt_id)
-            .bind(final_product_id)
-            .bind(price_in_cents)
-            .bind(article.quantity)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .bind(receipt_id)
+        .bind(final_product_id)
+        .bind(price_in_cents)
+        .bind(article.quantity)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        if let Some(ref ean_code) = article.ean {
+            if !ean_code.trim().is_empty() {
+                let _ = sqlx::query(
+                    "INSERT OR IGNORE INTO ean_products (ean, name) VALUES (?, ?)"
+                )
+                .bind(ean_code)
+                .bind(&article.name)
+                .execute(&state.ean_db)
+                .await;
+            }
+        }
     }
 
     tx.commit().await
