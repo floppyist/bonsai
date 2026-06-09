@@ -151,6 +151,9 @@ const initializeQrScanner = async (videoElement) => {
       (result, err) => {
         if (result) {
           const scannedEan = result.getText();
+
+          if (!scannedEan) return;
+
           const activeIndex = currentTargetEanIndex.value;
 
           stopEanScanner();
@@ -163,7 +166,6 @@ const initializeQrScanner = async (videoElement) => {
         }
       }
     );
-
   } catch (err) {
     console.error("Kamera-Setup fehlgeschlagen:", err);
     alert(`Fehler beim Starten der Kamera: ${err.message}`);
@@ -181,19 +183,22 @@ const stopEanScanner = () => {
     codeReaderControls = null;
   }
 
+  if (codeReaderInstance) {
+    try {
+      codeReaderInstance.reset();
+    } catch (e) {
+      console.warn("ZXing reset fehler:", e);
+    }
+    codeReaderInstance = null;
+  }
+
   const videoElement = document.querySelector('video');
   if (videoElement && videoElement.srcObject) {
     const stream = videoElement.srcObject;
     const tracks = stream.getTracks();
-
-    tracks.forEach(track => {
-      track.stop();
-    });
-
+    tracks.forEach(track => track.stop());
     videoElement.srcObject = null;
   }
-
-  codeReaderInstance = null;
 };
 
 const saveAndCloseReceipt = () => {
