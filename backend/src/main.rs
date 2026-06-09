@@ -64,6 +64,8 @@ async fn main() {
         .route("/api/upload-receipt", post(api::handlers::upload_receipt))
         .route("/api/ean/{ean}", get(api::handlers::lookup_ean))
         .route("/api/finalize-receipt", post(api::handlers::finalize_receipt))
+        .route("/api/pantry/summary", get(api::handlers::get_pantry_summary))
+        .route("/api/pantry/category/{category}", get(api::handlers::get_pantry_category_details))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);

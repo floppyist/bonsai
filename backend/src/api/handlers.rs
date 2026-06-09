@@ -216,3 +216,76 @@ pub async fn finalize_receipt(
 
     Ok(StatusCode::CREATED)
 }
+
+pub async fn get_pantry_summary(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+
+    let rows = sqlx::query(
+        "SELECT 
+            p.category, 
+            SUM(ri.quantity) as total_quantity, 
+            CAST(SUM(ri.price * ri.quantity) AS INTEGER) as total_price_cents
+         FROM receipt_items ri
+         JOIN products p ON ri.product_id = p.id
+         WHERE p.is_deleted = 0
+         GROUP BY p.category"
+    )
+    .fetch_all(&state.user_db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let mut summary = serde_json::json!([]);
+    for row in rows {
+        let category: String = row.get("category");
+        let total_quantity: f64 = row.get("total_quantity");
+        let total_price_cents: i64 = row.get("total_price_cents");
+        
+        summary.as_array_mut().unwrap().push(serde_json::json!({
+            "category": category,
+            "total_quantity": total_quantity,
+            "total_price": (total_price_cents as f64) / 100.0
+        }));
+    }
+
+    Ok(Json(summary))
+}
+
+pub async fn get_pantry_category_details(
+    State(state): State<Arc<AppState>>,
+    Path(category): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+
+    let rows = sqlx::query(
+        "SELECT 
+            p.name, 
+            p.brand, 
+            SUM(ri.quantity) as quantity, 
+            CAST(ri.price AS REAL) / 100.0 as unit_price
+         FROM receipt_items ri
+         JOIN products p ON ri.product_id = p.id
+         WHERE p.category = ? AND p.is_deleted = 0
+         GROUP BY p.name, p.brand, ri.price"
+    )
+    .bind(&category)
+    .fetch_all(&state.user_db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let mut details = serde_json::json!([]);
+    for row in rows {
+        let name: String = row.get("name");
+        let brand: String = row.get("brand");
+        let quantity: f64 = row.get("quantity");
+        let unit_price: f64 = row.get("unit_price");
+
+        details.as_array_mut().unwrap().push(serde_json::json!({
+            "name": name,
+            "brand": brand,
+            "quantity": quantity,
+            "price": unit_price * quantity
+        }));
+    }
+
+    Ok(Json(details))
+}

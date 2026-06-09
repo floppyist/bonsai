@@ -20,7 +20,9 @@ export const useBonsaiStore = defineStore('bonsai', {
       scannedTotalAmount: null
     },
 
-    isSubmittingReceipt: false
+    pantrySummary: [],
+
+    isSubmittingReceipt: false,
   }),
 
   getters: {
@@ -159,6 +161,16 @@ export const useBonsaiStore = defineStore('bonsai', {
         return false
       } finally {
         this.isSubmittingReceipt = false
+      }
+    },
+
+    async fetchPantrySummary() {
+      try {
+        const response = await fetch('/api/pantry/summary')
+        if (!response.ok) return
+        this.pantrySummary = await response.json()
+      } catch (error) {
+        console.error('Failed fetching pantry summary:', error)
       }
     }
   }
