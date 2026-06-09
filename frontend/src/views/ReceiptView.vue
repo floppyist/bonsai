@@ -69,7 +69,6 @@ watch(() => props.receiptData, (newData) => {
 const updateEan = async (index, newEan) => {
   if (!articles.value[index]) return
 
-  // 1. EAN im UI-State setzen, damit die Warnung weggeht
   articles.value[index].ean = newEan
 
   try {
@@ -194,26 +193,6 @@ const isFormInvalid = computed(() => {
   return isStoreInvalid.value || isDateInvalid.value || isPriceInvalid.value || isMissingEan.value || hasDuplicateEan.value
 })
 
-const handleSave = () => {
-  if (isFormInvalid.value) return
-
-  const updatedData = {
-    ...props.receiptData,
-    store_name: editedStore.value,
-    date: editedDate.value,
-    articles: articles.value.map(item => ({
-      name: item.name,
-      quantity: Number(item.quantity),
-      price_unit: Number(item.price),
-      price_total: Number((Number(item.price) * Number(item.quantity)).toFixed(2)),
-      ean: item.ean
-    })),
-    total_amount: Number(totalAmount.value.toFixed(2))
-  }
-
-  emit('saveAndCloseReceipt', updatedData)
-}
-
 const manuallyEnterEan = (index) => {
   const currentEan = articles.value[index]?.ean || ''
   const input = prompt('Bitte EAN-Barcode manuell eingeben:', currentEan)
@@ -223,6 +202,50 @@ const manuallyEnterEan = (index) => {
     if (cleanedEan) {
       updateEan(index, cleanedEan)
     }
+  }
+}
+
+const isSubmitting = ref(false)
+
+const handleSave = async () => {
+  if (isFormInvalid.value) return
+
+  isSubmitting.value = true
+
+const payload = {
+  retailer: editedStore.value || 'Unbekannter Händler',
+  receipt_date: editedDate.value || new Date().toISOString().split('T')[0],
+  total_amount: Number(totalAmount.value.toFixed(2)),
+  articles: articles.value.map(item => ({
+    name: item.name,
+    quantity: parseFloat(item.quantity) || 1.0,
+    price: parseFloat(item.price) || 0.0,
+    ean: item.ean || null
+  }))
+}
+
+  try {
+    const response = await fetch('/api/finalize-receipt', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server-Fehler: ${response.status}`)
+    }
+
+    console.log('Kassenbon erfolgreich verbucht!')
+
+    emit('saveAndCloseReceipt')
+
+  } catch (error) {
+    console.error('Fehler beim Finalisieren des Bons:', error)
+    alert('Speichern fehlgeschlagen: ' + error.message)
+  } finally {
+    isSubmitting.value = false
   }
 }
 </script>
@@ -514,15 +537,16 @@ const manuallyEnterEan = (index) => {
 
       <button
         @click="handleSave"
-        :disabled="isFormInvalid"
+        :disabled="isFormInvalid || isSubmitting"
         :class="[
           'w-full font-bold py-4 px-4 rounded-xl text-sm shadow-lg transition-all duration-200 min-h-[48px]',
-          isFormInvalid
+          (isFormInvalid || isSubmitting)
             ? 'bg-zinc-700/50 text-zinc-400 border border-zinc-600/30 cursor-not-allowed opacity-60'
             : 'bg-[#CCFF33] hover:bg-[#b2eb2a] text-zinc-900 cursor-pointer active:scale-[0.99]'
         ]"
       >
-        <template v-if="isMissingEan">Bitte erst alle Barcodes scannen</template>
+        <template v-if="isSubmitting">Wird gespeichert...</template>
+        <template v-else-if="isMissingEan">Bitte erst alle Barcodes scannen</template>
         <template v-else-if="hasDuplicateEan">Doppelte Barcodes korrigieren</template>
         <template v-else-if="isPriceInvalid">Preis/Summe darf nicht 0 € sein</template>
         <template v-else-if="isStoreInvalid">Händler-Namen korrigieren</template>

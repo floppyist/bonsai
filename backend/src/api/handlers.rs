@@ -1,5 +1,7 @@
-use sqlx::Row;
 use std::sync::Arc;
+
+use sqlx::Row;
+use sqlx::SqlitePool;
 
 use axum::Json;
 use axum::extract::Path;
@@ -7,8 +9,11 @@ use axum::response::IntoResponse;
 use axum::http::StatusCode;
 use axum::extract::State;
 use axum::body::Bytes;
+use axum::Extension;
 
 use log::error;
+
+use super::models::FinalizeReceiptPayload;
 
 use crate::AppState;
 use crate::ocr;
@@ -40,7 +45,7 @@ pub async fn lookup_ean(
     State(state): State<Arc<AppState>>,
     Path(ean): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    
+
     let result = sqlx::query("SELECT name FROM ean_products WHERE ean = ?")
         .bind(&ean)
         .fetch_optional(&state.ean_db)
@@ -70,4 +75,106 @@ pub async fn lookup_ean(
             Ok(Json(response))
         }
     }
+}
+
+
+
+pub async fn finalize_receipt(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<FinalizeReceiptPayload>,
+) -> Result<StatusCode, (StatusCode, String)> {
+
+    let user_db = &state.user_db;
+
+    let mut tx = user_db.begin().await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let receipt_row = sqlx::query(
+        "INSERT INTO receipts (retailer, receipt_date) VALUES (?, ?) RETURNING id"
+    )
+        .bind(&payload.retailer)
+        .bind(&payload.receipt_date)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let receipt_id: i64 = receipt_row.get("id");
+
+    for article in payload.articles {
+        let mut product_id: Option<i64> = None;
+
+        if let Some(ref ean_code) = article.ean {
+            let row = sqlx::query(
+                "SELECT id FROM products WHERE ean = ? AND is_deleted = 0 LIMIT 1"
+            )
+                .bind(ean_code)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            if let Some(r) = row {
+                product_id = Some(r.get("id"));
+            }
+        }
+
+        if product_id.is_none() {
+            let row = sqlx::query(
+                "SELECT id FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
+            )
+                .bind(&article.name)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            if let Some(r) = row {
+                let existing_id: i64 = r.get("id");
+                product_id = Some(existing_id);
+
+                if article.ean.is_some() {
+                    sqlx::query(
+                        "UPDATE products SET ean = ? WHERE id = ?"
+                    )
+                        .bind(&article.ean)
+                        .bind(existing_id)
+                        .execute(&mut *tx)
+                        .await
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                }
+            }
+        }
+
+        let final_product_id = match product_id {
+            Some(id) => id,
+            None => {
+                let new_product_row = sqlx::query(
+                    "INSERT INTO products (name, ean) VALUES (?, ?) RETURNING id"
+                )
+                    .bind(&article.name)
+                    .bind(&article.ean)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+                new_product_row.get("id")
+            }
+        };
+
+        let price_in_cents = (article.price * 100.0).round() as i64;
+
+        sqlx::query(
+            "INSERT INTO receipt_items (receipt_id, product_id, price, quantity) VALUES (?, ?, ?, ?)"
+        )
+            .bind(receipt_id)
+            .bind(final_product_id)
+            .bind(price_in_cents)
+            .bind(article.quantity)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
+    tx.commit().await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::CREATED)
 }

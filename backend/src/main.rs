@@ -63,6 +63,7 @@ async fn main() {
     let app = Router::new()
         .route("/api/upload-receipt", post(api::handlers::upload_receipt))
         .route("/api/ean/{ean}", get(api::handlers::lookup_ean))
+        .route("/api/finalize-receipt", post(api::handlers::finalize_receipt))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);
