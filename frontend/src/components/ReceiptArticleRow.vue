@@ -94,7 +94,7 @@ const handleBlurCleanup = (field, currentValue) => {
             <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Kategorie</label>
             <select
               :value="item.category"
-              @change="emit('updateField', index, 'category', $target.value)"
+              @change="emit('updateField', index, 'category', $event.target.value)"
               class="w-full bg-white border border-zinc-300 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none focus:border-[#2D6A4F] text-[#2D3A34] min-h-[38px] cursor-pointer"
             >
               <option v-for="cat in categoriesList" :key="cat.value" :value="cat.value">
