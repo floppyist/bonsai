@@ -16,7 +16,6 @@ use crate::api::categories::ProductCategory;
 
 use crate::AppState;
 use crate::ocr;
-use crate::db::save_receipt;
 
 pub async fn upload_receipt(
     State(state): State<Arc<AppState>>,
@@ -30,12 +29,6 @@ pub async fn upload_receipt(
             return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("OCR Pipeline error: {}", err)));
         }
     };
-
-    if save_receipt(&state.user_db, &receipt).await.is_err() {
-        error!("Failed to save receipt to database");
-
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to persist data".into()));
-    }
 
     Ok(Json(receipt))
 }
