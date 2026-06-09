@@ -44,7 +44,7 @@ pub async fn establish_database_connection(options: &BonsaiOptions) -> Result<Sq
 
     debug!("Process DB migration...");
 
-    if let Err(e) = migrate!("./migrations").run(&pool).await {
+    if let Err(e) = migrate!("./migrations/user").run(&pool).await {
         error!("Migration failed: '{}'", e);
         return Err(DBError::Migration);
     }
