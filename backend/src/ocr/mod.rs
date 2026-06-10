@@ -41,20 +41,69 @@ where
     }
 }
 
+fn deserialize_field_string<'de, D>(deserializer: D) -> Result<Field<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FlatOrWrapped {
+        Wrapped { value: String },
+        Flat(String),
+        Object(serde_json::Value),
+    }
+
+    match FlatOrWrapped::deserialize(deserializer)? {
+        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
+        FlatOrWrapped::Flat(s) => Ok(Field { value: s }),
+        FlatOrWrapped::Object(obj) => {
+            if let Some(v) = obj.get("value").and_then(|v| v.as_str()) {
+                Ok(Field { value: v.to_string() })
+            } else {
+                Ok(Field { value: obj.to_string() })
+            }
+        }
+    }
+}
+
+fn deserialize_field_opt_string<'de, D>(deserializer: D) -> Result<Field<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FlatOrWrapped {
+        Wrapped { value: Option<String> },
+        Flat(String),
+        Null,
+    }
+
+    match FlatOrWrapped::deserialize(deserializer)? {
+        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
+        FlatOrWrapped::Flat(s) => Ok(Field { value: Some(s) }),
+        FlatOrWrapped::Null => Ok(Field { value: None }),
+    }
+}
+
 fn deserialize_field_f64<'de, D>(deserializer: D) -> Result<Field<f64>, D::Error>
 where
     D: Deserializer<'de>,
 {
     #[derive(Deserialize)]
-    struct RawField {
+    #[serde(untagged)]
+    enum FlatOrWrapped {
+        Wrapped {
+            #[serde(deserialize_with = "deserialize_flexible_f64")]
+            value: f64,
+        },
         #[serde(deserialize_with = "deserialize_flexible_f64")]
-        value: f64,
+        Flat(f64),
     }
 
-    let raw = RawField::deserialize(deserializer)?;
-    Ok(Field {
-        value: raw.value,
-    })
+    match FlatOrWrapped::deserialize(deserializer)? {
+        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
+        FlatOrWrapped::Flat(f) => Ok(Field { value: f }),
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -69,7 +118,9 @@ pub struct Article {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Receipt {
+    #[serde(deserialize_with = "deserialize_field_string")]
     pub retailer: Field<String>,
+    #[serde(deserialize_with = "deserialize_field_opt_string")]
     pub date: Field<Option<String>>,
     pub articles: Vec<Article>,
     #[serde(deserialize_with = "deserialize_field_f64")]

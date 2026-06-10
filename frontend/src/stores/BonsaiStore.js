@@ -99,15 +99,12 @@ export const useBonsaiStore = defineStore('bonsai', {
       this.currentReceipt.scannedTotalAmount = Number(rawData.total_amount?.value ?? rawData.total_amount ?? null)
 
       this.currentReceipt.articles = Array.isArray(rawData.articles) ? rawData.articles.map(item => {
-        // Den ursprünglichen Namen sichern, bevor irgendetwas formatiert wird
         const originalName = item.name || 'Unbekannter Artikel';
 
         return {
           ...item,
-          // 1. Das Lernfeld: Unberührt im Originalzustand mitschleifen (außer es existiert bereits)
           raw_ocr_name: item.raw_ocr_name ?? String(originalName),
 
-          // 2. Das UI-Feld: Bereit für die Live-Sanitizer und Edits der UI
           name: String(originalName).toUpperCase(),
 
           price: Number(item.price ?? item.price_unit ?? 0.00),
@@ -138,7 +135,7 @@ export const useBonsaiStore = defineStore('bonsai', {
     addNewArticle() {
       this.currentReceipt.articles.push({
         name: '',
-        raw_ocr_name: '', // <-- Wichtig: Leer lassen, da nicht aus OCR entstanden!
+        raw_ocr_name: '',
         brand: 'UNKNOWN',
         category: 'UNCATEGORIZED',
         price: 0.00,

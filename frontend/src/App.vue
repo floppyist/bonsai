@@ -75,7 +75,7 @@ if (isDevMode.value) {
     store.setReceiptData({
       articles: MOCK_RECEIPT_DATA.items.map(item => ({
         name: item.name,
-        raw_ocr_name: item.name, // <-- Neu: Als Startwert mitschleifen
+        raw_ocr_name: item.name,
         quantity: item.quantity,
         price: item.price,
         ean: null

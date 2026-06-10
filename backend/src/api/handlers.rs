@@ -32,7 +32,6 @@ fn clean_ocr_name(raw_name: &str) -> String {
         .filter(|c| c.is_alphanumeric() || [' ', '-', '&', '.', ',', '%'].contains(c))
         .collect::<String>();
 
-    // Wirft alle mehrfachen Leerzeichen raus und macht eins draus
     intermediate
         .split_whitespace()
         .collect::<Vec<&str>>()
@@ -44,7 +43,6 @@ pub async fn upload_receipt(
     body_bytes: Bytes
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
 
-    // 1. Hole das originale Struct aus der Pipeline
     let receipt_struct = match ocr::run_ocr_pipeline(&body_bytes, &state.config).await {
         Ok(r) => r,
         Err(err) => {
@@ -53,11 +51,9 @@ pub async fn upload_receipt(
         }
     };
 
-    // 2. Konvertiere das Struct explizit in ein flexibles serde_json::Value
     let mut receipt_val: serde_json::Value = serde_json::to_value(receipt_struct)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to serialize OCR response: {}", e)))?;
 
-    // 3. Typensicheres und extrem tolerantes Auslesen des Retailers aus dem Value-Baum
     let extracted_retailer = receipt_val
         .get("retailer")
         .and_then(|r| {
@@ -83,7 +79,6 @@ pub async fn upload_receipt(
                     let clean_name = clean_ocr_name(raw_name);
                     if clean_name.is_empty() { continue; }
 
-                    // NEU: Wir injizieren den gesäuberten OCR-Namen direkt in das JSON für das Frontend
                     article["raw_ocr_name"] = serde_json::json!(clean_name);
 
                     let mut matched_data = None;
@@ -111,7 +106,6 @@ pub async fn upload_receipt(
                             Some(row.get::<String, _>("ean"))
                         ));
                     } else {
-                        // 2. Prio: Historischer Match
                         let history_match = sqlx::query(
                             "SELECT p.name, p.category, p.brand, p.ean \
                                 FROM products p \
@@ -137,7 +131,6 @@ pub async fn upload_receipt(
                                 row.get::<Option<String>, _>("ean")
                             ));
                         } else {
-                            // 3. Prio: EAN-Stammdaten Match
                             let ean_match = sqlx::query(
                                 "SELECT name, category, brand, ean FROM ean_products \
                                     WHERE TRIM(name) = ? COLLATE NOCASE \
@@ -357,7 +350,6 @@ pub async fn finalize_receipt(
                     error!("Konnte ean_products nicht aktualisieren: {}", e);
                 }
 
-                // NEU: Nur ins Wörterbuch eintragen, wenn wir einen gültigen raw_ocr_name haben
                 let cleaned_ocr_field = clean_ocr_name(&article.raw_ocr_name);
                 if !cleaned_ocr_field.is_empty() {
                     if let Err(e) = sqlx::query(
@@ -368,7 +360,7 @@ pub async fn finalize_receipt(
                     )
                         .bind(ean_code)
                         .bind(&payload.retailer)
-                        .bind(&cleaned_ocr_field) // <-- Hier nutzen wir den sauberen OCR-Namen vom Bon!
+                        .bind(&cleaned_ocr_field)
                         .execute(&state.ean_db)
                     .await
                     {
@@ -451,8 +443,6 @@ pub async fn revalidate_articles(
 
     if !retailer.is_empty() {
         for article in &mut articles {
-            // NEU: Wenn ein raw_ocr_name mitgeschickt wurde, suchen wir mit diesem (da article.name editiert sein könnte).
-            // Falls leer (z.B. neu hinzugefügter Artikel im Frontend), weichen wir auf article.name aus.
             let source_name = if !article.raw_ocr_name.is_empty() {
                 &article.raw_ocr_name
             } else {
@@ -487,7 +477,6 @@ pub async fn revalidate_articles(
                     Some(row.get::<String, _>("ean"))
                 ));
             } else {
-                // 2. Prio: Historischer Match
                 let history_match = sqlx::query(
                     "SELECT p.name, p.category, p.brand, p.ean \
                         FROM products p \
@@ -516,7 +505,6 @@ pub async fn revalidate_articles(
                         row.get::<Option<String>, _>("ean")
                     ));
                 } else {
-                    // 3. Prio: Globale EAN-Stammdaten
                     let ean_match = sqlx::query(
                         "SELECT name, category, brand, ean FROM ean_products \
                             WHERE TRIM(name) = ? COLLATE NOCASE \
