@@ -41,7 +41,6 @@ const handleLiveSanitize = (field, originalValue) => {
     if (field === 'brand') brandValidationMsg.value = '✨ Perfekt formatiert';
   }
 
-  // Direktes Schreiben in das reaktive Prop-Objekt, das vom Store kommt
   props.item[field] = transformed
 }
 

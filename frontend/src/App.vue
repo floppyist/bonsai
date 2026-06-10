@@ -1,6 +1,8 @@
 <script setup>
 import { ref, provide } from 'vue'
 import { useRouter } from 'vue-router'
+import { useBonsaiStore } from './stores/BonsaiStore.js'
+
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library'
 
 import PantryHeader from './components/PantryHeader.vue'
@@ -8,7 +10,8 @@ import VisionOverlay from './components/VisionOverlay.vue'
 import EanScannerModal from './components/modals/EanScannerModal.vue'
 import BottomNav from './components/BottomNav.vue'
 
-const router = useRouter()
+const router = useRouter();
+const store = useBonsaiStore();
 
 const scanStep = ref(0)
 const receiptData = ref(null)
@@ -25,8 +28,6 @@ let codeReaderControls = null
 
 const isDevMode = ref(false)
 provide('isDevMode', isDevMode)
-
-const receiptViewRef = ref(null)
 
 const pantryItems = ref([
   { id: 1, name: 'Frische Bio-Avocado', category: 'Gemüse & Früchte', emoji: '🥑', stock: 90, stockColor: '#52B788', daysLeft: '3 Tage', status: 'urgent' },
@@ -71,14 +72,14 @@ const handleFileUpload = (event) => {
 
   if (isDevMode.value) {
     setTimeout(() => {
-      receiptData.value = {
+      store.setReceiptData({
         articles: MOCK_RECEIPT_DATA.items.map(item => ({
           name: item.name,
           quantity: item.quantity,
           price: item.price,
           ean: null
         }))
-      };
+      });
       scanStep.value = 3;
 
       setTimeout(() => {
@@ -108,7 +109,7 @@ const handleFileUpload = (event) => {
       showOverlay.value = false;
       isProcessingInBackground.value = false;
     } else {
-      receiptData.value = payload;
+      store.setReceiptData(payload);
       scanStep.value = 3;
 
       setTimeout(() => {
@@ -125,7 +126,7 @@ const handleFileUpload = (event) => {
 
 const startEanScanner = (index) => {
   currentTargetEanIndex.value = index;
-  currentTargetEanName.value = receiptData.value.articles[index].name;
+  currentTargetEanName.value = store.currentReceipt.articles[index]?.name || '';
   showEanModal.value = true;
 };
 
@@ -155,34 +156,10 @@ const initializeQrScanner = async (videoElement) => {
 
           const activeIndex = currentTargetEanIndex.value;
 
-          // 1. Schließe die Kamera sofort, um Deadlocks zu vermeiden
           stopEanScanner();
 
-          // 2. Entkopple die API-Abfrage in den nächsten Event-Loop-Tick
           setTimeout(() => {
-            if (receiptViewRef.value && typeof receiptViewRef.value.updateEan === 'function') {
-              receiptViewRef.value.updateEan(activeIndex, scannedEan);
-            } else {
-              // Lokale Zuweisung, falls die View-Referenz temporär verloren ging
-              receiptData.value.articles[activeIndex].ean = scannedEan;
-
-              // Hier wird die Backend-Lücke geschlossen:
-              fetch(`https://bonsai.pi:3000/api/ean/${scannedEan}`)
-                .then(response => {
-                  if (!response.ok) throw new Error('EAN nicht im System');
-                  return response.json();
-                })
-                .then(backendData => {
-                  if (backendData) {
-                    if (backendData.name) receiptData.value.articles[activeIndex].name = backendData.name.toUpperCase();
-                    if (backendData.brand) receiptData.value.articles[activeIndex].brand = backendData.brand.toUpperCase();
-                    if (backendData.category) receiptData.value.articles[activeIndex].category = backendData.category;
-                  }
-                })
-                .catch(fetchErr => {
-                  console.warn("EAN nicht im Backend verzeichnet:", fetchErr);
-                });
-            }
+            store.lookupEanForArticle(activeIndex, scannedEan);
           }, 50);
         }
       }
@@ -241,8 +218,8 @@ const saveAndCloseReceipt = () => {
         <router-view v-slot="{ Component }">
           <component
             :is="Component"
-            ref="receiptViewRef" :pantryItems="pantryItems"
-            :receiptData="receiptData"
+            ref="receiptViewRef"
+            :pantryItems="pantryItems"
             :formatPrice="formatPrice"
             @startEanScanner="startEanScanner"
             @saveAndCloseReceipt="saveAndCloseReceipt"

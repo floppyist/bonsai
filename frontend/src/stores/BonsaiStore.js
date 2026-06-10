@@ -8,10 +8,7 @@ export const useBonsaiStore = defineStore('bonsai', {
       { id: 1, retailer: 'Rewe Markt', date: '2026-06-08', itemCount: 5, totalAmount: 24.50 }
     ],
 
-    pantryItems: [
-      { id: 1, name: 'Milch', category: 'Milchprodukte & Eier', emoji: '🥛', stock: 80, stockColor: '#52B788', status: 'good', daysLeft: '5 Tage' },
-      { id: 2, name: 'Tomaten', category: 'Obst & Gemüse', emoji: '🥦', stock: 20, stockColor: '#EF4444', status: 'urgent', daysLeft: '1 Tag' }
-    ],
+    pantryItems: [],
 
     currentReceipt: {
       retailer: '',

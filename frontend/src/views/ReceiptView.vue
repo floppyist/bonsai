@@ -6,10 +6,6 @@ import ReceiptArticleRow from '../components/ReceiptArticleRow.vue'
 import ReceiptSummary from '../components/ReceiptSummary.vue'
 
 const props = defineProps({
-  receiptData: {
-    type: Object,
-    default: null
-  },
   formatPrice: {
     type: Function,
     default: (p) => `${Number(p).toFixed(2)} €`
