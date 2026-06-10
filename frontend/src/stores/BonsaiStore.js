@@ -98,15 +98,25 @@ export const useBonsaiStore = defineStore('bonsai', {
 
       this.currentReceipt.scannedTotalAmount = Number(rawData.total_amount?.value ?? rawData.total_amount ?? null)
 
-      this.currentReceipt.articles = Array.isArray(rawData.articles) ? rawData.articles.map(item => ({
-        ...item,
-        price: Number(item.price ?? item.price_unit ?? 0.00),
-        quantity: item.quantity || 1,
-        name: String(item.name || 'Unbekannter Artikel').toUpperCase(),
-        ean: item.ean || null,
-        category: item.category || 'UNCATEGORIZED',
-        brand: String(item.brand || 'UNKNOWN').toUpperCase()
-      })) : []
+      this.currentReceipt.articles = Array.isArray(rawData.articles) ? rawData.articles.map(item => {
+        // Den ursprünglichen Namen sichern, bevor irgendetwas formatiert wird
+        const originalName = item.name || 'Unbekannter Artikel';
+
+        return {
+          ...item,
+          // 1. Das Lernfeld: Unberührt im Originalzustand mitschleifen (außer es existiert bereits)
+          raw_ocr_name: item.raw_ocr_name ?? String(originalName),
+
+          // 2. Das UI-Feld: Bereit für die Live-Sanitizer und Edits der UI
+          name: String(originalName).toUpperCase(),
+
+          price: Number(item.price ?? item.price_unit ?? 0.00),
+          quantity: item.quantity || 1,
+          ean: item.ean || null,
+          category: item.category || 'UNCATEGORIZED',
+          brand: String(item.brand || 'UNKNOWN').toUpperCase()
+        }
+      }) : []
     },
 
     updateArticleField(index, field, value) {
@@ -127,13 +137,14 @@ export const useBonsaiStore = defineStore('bonsai', {
     },
     addNewArticle() {
       this.currentReceipt.articles.push({
-        name: 'NEUER ARTIKEL',
-        quantity: 1,
-        price: 1.00,
-        ean: null,
+        name: '',
+        raw_ocr_name: '', // <-- Wichtig: Leer lassen, da nicht aus OCR entstanden!
+        brand: 'UNKNOWN',
         category: 'UNCATEGORIZED',
-        brand: 'UNKNOWN'
-      })
+        price: 0.00,
+        quantity: 1,
+        ean: null
+      });
     },
 
     async lookupEanForArticle(index, ean) {
@@ -206,6 +217,38 @@ export const useBonsaiStore = defineStore('bonsai', {
       } catch (error) {
         console.error('Failed fetching pantry summary:', error)
       }
-    }
+    },
+
+    updateRetailer(name) {
+      this.currentReceipt.retailer = name
+      this.revalidateCurrentArticles()
+    },
+
+    async revalidateCurrentArticles() {
+      if (!this.currentReceipt.retailer || this.currentReceipt.articles.length === 0) return;
+
+      try {
+        const response = await fetch('/api/receipt/revalidate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            retailer: this.currentReceipt.retailer,
+            articles: this.currentReceipt.articles
+          })
+        });
+
+        if (response.ok) {
+          const updatedArticles = await response.json();
+
+          this.currentReceipt.articles = updatedArticles;
+
+          console.log('✨ Artikel erfolgreich revalidiert für:', this.currentReceipt.retailer);
+        } else {
+          console.error("Revalidation fehlgeschlagen:", response.statusText);
+        }
+      } catch (err) {
+        console.error("Fehler beim Live-Abgleich der Artikel:", err);
+      }
+    },
   }
 })

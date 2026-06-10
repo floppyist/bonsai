@@ -24,11 +24,11 @@ const ALLOWED_BRAND_REGEX = /[^A-Z0-9 \-&%]/g;
 
 const handleLiveSanitize = (field, originalValue) => {
   let transformed = originalValue
-    .toUpperCase()
-    .replace(/Ä/g, 'AE')
-    .replace(/Ö/g, 'OE')
-    .replace(/Ü/g, 'UE')
-    .replace(/ß/g, 'SS');
+  .toUpperCase()
+  .replace(/Ä/g, 'AE')
+  .replace(/Ö/g, 'OE')
+  .replace(/Ü/g, 'UE')
+  .replace(/ß/g, 'SS');
 
   const regex = field === 'name' ? ALLOWED_NAME_REGEX : ALLOWED_BRAND_REGEX;
 

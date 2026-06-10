@@ -70,17 +70,18 @@ const handleFileUpload = (event) => {
   receiptData.value = null;
   scanStep.value = 2;
 
-  if (isDevMode.value) {
-    setTimeout(() => {
-      store.setReceiptData({
-        articles: MOCK_RECEIPT_DATA.items.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          ean: null
-        }))
-      });
-      scanStep.value = 3;
+if (isDevMode.value) {
+  setTimeout(() => {
+    store.setReceiptData({
+      articles: MOCK_RECEIPT_DATA.items.map(item => ({
+        name: item.name,
+        raw_ocr_name: item.name, // <-- Neu: Als Startwert mitschleifen
+        quantity: item.quantity,
+        price: item.price,
+        ean: null
+      }))
+    });
+    scanStep.value = 3;
 
       setTimeout(() => {
         showOverlay.value = false;

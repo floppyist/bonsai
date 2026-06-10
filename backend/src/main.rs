@@ -62,6 +62,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/upload-receipt", post(api::handlers::upload_receipt))
+        .route("/api/receipt/revalidate", post(api::handlers::revalidate_articles))
         .route("/api/ean/{ean}", get(api::handlers::lookup_ean))
         .route("/api/finalize-receipt", post(api::handlers::finalize_receipt))
         .route("/api/pantry/summary", get(api::handlers::get_pantry_summary))

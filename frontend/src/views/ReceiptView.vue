@@ -69,7 +69,8 @@ const handleSave = async () => {
   <div class="animate-[fadeIn_0.3s_ease-out] space-y-4 pb-12 w-full max-w-full overflow-hidden">
 
     <ReceiptHeader
-      v-model:store="store.currentReceipt.retailer"
+      :store="store.currentReceipt.retailer"
+      @update:store="store.updateRetailer"
       v-model:date="store.currentReceipt.date"
       :isStoreInvalid="store.isStoreInvalid"
       :isDateInvalid="store.isDateInvalid"
