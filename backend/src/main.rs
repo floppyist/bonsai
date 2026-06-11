@@ -3,6 +3,7 @@ mod logger;
 mod ocr;
 mod db;
 mod api;
+mod util;
 
 use axum::routing::get;
 use std::net::SocketAddr;

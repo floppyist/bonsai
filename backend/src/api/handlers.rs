@@ -1,42 +1,21 @@
 use std::sync::Arc;
-use sqlx::Row;
+
 use axum::Json;
 use axum::extract::Path;
 use axum::response::IntoResponse;
 use axum::http::StatusCode;
 use axum::extract::State;
 use axum::body::Bytes;
+
 use log::error;
+
+use sqlx::Row;
 
 use super::models::FinalizeReceiptPayload;
 use crate::api::categories::ProductCategory;
-use crate::AppState;
+use crate::{AppState, util};
 use crate::api::models::RevalidateReceiptPayload;
 use crate::ocr;
-
-fn sanitize_ean(ean: &str) -> String {
-    ean.trim()
-        .trim_matches('\'')
-        .trim_matches('"')
-        .to_string()
-}
-
-fn clean_ocr_name(raw_name: &str) -> String {
-    let intermediate = raw_name
-        .to_uppercase()
-        .replace('Ä', "AE")
-        .replace('Ö', "OE")
-        .replace('Ü', "UE")
-        .replace('ß', "SS")
-        .chars()
-        .filter(|c| c.is_alphanumeric() || [' ', '-', '&', '.', ',', '%'].contains(c))
-        .collect::<String>();
-
-    intermediate
-        .split_whitespace()
-        .collect::<Vec<&str>>()
-        .join(" ")
-}
 
 pub async fn upload_receipt(
     State(state): State<Arc<AppState>>,
@@ -76,7 +55,7 @@ pub async fn upload_receipt(
             for article in articles_array {
                 if let Some(raw_name) = article.get("name").and_then(|n| n.as_str()) {
 
-                    let clean_name = clean_ocr_name(raw_name);
+                    let clean_name = util::clean_ocr_name(raw_name);
                     if clean_name.is_empty() { continue; }
 
                     article["raw_ocr_name"] = serde_json::json!(clean_name);
@@ -161,7 +140,7 @@ pub async fn upload_receipt(
                             article["brand"] = serde_json::json!(db_brand);
                         }
                         if article.get("ean").and_then(|e| e.as_str()).is_none() && db_ean.is_some() {
-                            article["ean"] = serde_json::json!(sanitize_ean(&db_ean.unwrap()));
+                            article["ean"] = serde_json::json!(util::sanitize_ean(&db_ean.unwrap()));
                         }
                     }
                 }
@@ -176,7 +155,8 @@ pub async fn lookup_ean(
     State(state): State<Arc<AppState>>,
     Path(ean): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let clean_ean = sanitize_ean(&ean);
+
+    let clean_ean = util::sanitize_ean(&ean);
 
     let result = sqlx::query("SELECT name, category, brand FROM ean_products WHERE ean = ?")
         .bind(&clean_ean)
@@ -200,6 +180,7 @@ pub async fn lookup_ean(
                 "brand": if brand.trim().is_empty() { "UNKNOWN".to_string() } else { brand },
                 "found": true
             });
+
             Ok(Json(response))
         }
         None => {
@@ -210,6 +191,7 @@ pub async fn lookup_ean(
                 "brand": "UNKNOWN",
                 "found": false
             });
+
             Ok(Json(response))
         }
     }
@@ -241,7 +223,7 @@ pub async fn finalize_receipt(
         let mut existing_category: ProductCategory = ProductCategory::Uncategorized;
         let mut existing_brand: String = "UNKNOWN".to_string();
 
-        let clean_article_ean = article.ean.as_ref().map(|e| sanitize_ean(e));
+        let clean_article_ean = article.ean.as_ref().map(|e| util::sanitize_ean(e));
 
         if let Some(ref ean_code) = clean_article_ean {
             let row = sqlx::query(
@@ -254,7 +236,7 @@ pub async fn finalize_receipt(
 
             if let Some(r) = row {
                 product_id = Some(r.get("id"));
-                existing_ean = r.get::<Option<String>, _>("ean").map(|e| sanitize_ean(&e));
+                existing_ean = r.get::<Option<String>, _>("ean").map(|e| util::sanitize_ean(&e));
                 existing_category = r.get("category");
                 existing_brand = r.get("brand");
             }
@@ -271,7 +253,7 @@ pub async fn finalize_receipt(
 
             if let Some(r) = row {
                 product_id = Some(r.get("id"));
-                existing_ean = r.get::<Option<String>, _>("ean").map(|e| sanitize_ean(&e));
+                existing_ean = r.get::<Option<String>, _>("ean").map(|e| util::sanitize_ean(&e));
                 existing_category = r.get("category");
                 existing_brand = r.get("brand");
             }
@@ -350,7 +332,7 @@ pub async fn finalize_receipt(
                     error!("Konnte ean_products nicht aktualisieren: {}", e);
                 }
 
-                let cleaned_ocr_field = clean_ocr_name(&article.raw_ocr_name);
+                let cleaned_ocr_field = util::clean_ocr_name(&article.raw_ocr_name);
                 if !cleaned_ocr_field.is_empty() {
                     if let Err(e) = sqlx::query(
                         "INSERT INTO ean_ocr_variants (ean, retailer, raw_ocr_name, confirmed_count) \
@@ -380,6 +362,7 @@ pub async fn finalize_receipt(
 pub async fn get_pantry_summary(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+
     let rows = sqlx::query(
         "SELECT p.category, SUM(ri.quantity) as total_quantity, CAST(SUM(ri.price * ri.quantity) AS INTEGER) as total_price_cents \
             FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 GROUP BY p.category"
@@ -406,6 +389,7 @@ pub async fn get_pantry_summary(
 pub async fn get_pantry_items(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+
     let rows = sqlx::query(
         "SELECT p.name, p.brand, p.category, SUM(ri.quantity) as quantity, CAST(ri.price AS REAL) / 100.0 as unit_price \
             FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 GROUP BY p.name, p.brand, p.category, ri.price"
@@ -449,7 +433,7 @@ pub async fn revalidate_articles(
                 &article.name
             };
 
-            let clean_name = clean_ocr_name(source_name);
+            let clean_name = util::clean_ocr_name(source_name);
             if clean_name.is_empty() { continue; }
 
             let mut matched_data = None;
