@@ -7,11 +7,9 @@
 
 Smart receipt scanning, barcode tracking, pantry management, and budgeting — all running locally.
 
-> [!CAUTION]
-> **Work in Progress (WIP)**
-> This project is currently in a very early development stage. Features might change drastically, break unexpectedly, or remain incomplete. Use with caution!
 
-<div style="display: flex; gap: 10px; width: 100%; margin-top: 20px; margin-bottom: 20px;">
+
+<div style="display: flex; height: 100px; gap: 10px; width: 100%; margin-top: 20px; margin-bottom: 20px;">
   <img style="flex: 1;" src="docs/screenshots/dashboard.png" width="220">
   <img style="flex: 1;" src="docs/screenshots/scan.png" width="220">
   <img style="flex: 1;" src="docs/screenshots/receipts.png" width="220">
@@ -38,6 +36,13 @@ Bonsai is a privacy-friendly, open source Progressive Web App (PWA) and `axum` b
 By scanning receipts and EAN barcodes, Bonsai automatically builds and maintains a digital pantry, tracks inventory levels, enriches products with nutritional information, and keeps an expense log in the background.
 
 Everything runs locally and can be self-hosted.
+
+---
+
+> [!CAUTION]
+> **Work in Progress (WIP)**
+>
+> This project is currently in a very early development stage. Features might change drastically, break unexpectedly, or remain incomplete. Use with caution!
 
 ---
 
