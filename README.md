@@ -7,14 +7,18 @@
 
 Smart receipt scanning, barcode tracking, pantry management, and budgeting — all running locally.
 
-<p align="center">
-  <img src="docs/screenshots/dashboard.png" width="220">
-  <img src="docs/screenshots/scan.png" width="220">
-  <img src="docs/screenshots/receipts.png" width="220">
-</p>
+> [!CAUTION]
+> **Work in Progress (WIP)**
+> This project is currently in a very early development stage. Features might change drastically, break unexpectedly, or remain incomplete. Use with caution!
+
+<div style="display: flex; gap: 10px; width: 100%; margin-top: 20px; margin-bottom: 20px;">
+  <img style="flex: 1;" src="docs/screenshots/dashboard.png" width="220">
+  <img style="flex: 1;" src="docs/screenshots/scan.png" width="220">
+  <img style="flex: 1;" src="docs/screenshots/receipts.png" width="220">
+</div>
 
 <p align="center">
-  Dashboard • Pantry • Receipt Scanner
+  Dashboard • Scanner • Receipts
 </p>
 
 <p>
@@ -29,7 +33,7 @@ Smart receipt scanning, barcode tracking, pantry management, and budgeting — a
 
 ---
 
-Bonsai is a privacy-friendly Progressive Web App (PWA) for managing groceries, pantry stock, and household expenses.
+Bonsai is a privacy-friendly, open source Progressive Web App (PWA) and `axum` backend for managing groceries, pantry stock, and household expenses.
 
 By scanning receipts and EAN barcodes, Bonsai automatically builds and maintains a digital pantry, tracks inventory levels, enriches products with nutritional information, and keeps an expense log in the background.
 
@@ -318,6 +322,6 @@ SQLite      Ollama
 
 ---
 
-# License
+## License
 
-This project is licensed under the terms of the license provided in this repository.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
