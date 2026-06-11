@@ -1,19 +1,19 @@
 use std::fs;
 
-use opencv::prelude::*;
-use opencv::imgproc;
-use opencv::imgcodecs;
-use opencv::core::no_array;
-use opencv::core::DECOMP_LU;
-use opencv::core::BORDER_DEFAULT;
-use opencv::core::BORDER_CONSTANT;
 use opencv::core::AlgorithmHint;
+use opencv::core::BORDER_CONSTANT;
+use opencv::core::BORDER_DEFAULT;
+use opencv::core::DECOMP_LU;
+use opencv::core::Mat;
+use opencv::core::Point;
+use opencv::core::Point2f;
 use opencv::core::Scalar;
 use opencv::core::Size;
-use opencv::core::Mat;
-use opencv::core::Point2f;
-use opencv::core::Point;
 use opencv::core::Vector;
+use opencv::core::no_array;
+use opencv::imgcodecs;
+use opencv::imgproc;
+use opencv::prelude::*;
 
 use anyhow::Result;
 use base64::Engine;
@@ -24,7 +24,7 @@ use crate::config::BonsaiOptions;
 pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
     debug!("Starting image optimization pipeline...");
     debug!("Converting input image to grayscale... (1/8)");
-    
+
     let mut gray = Mat::default();
 
     imgproc::cvt_color(
@@ -74,13 +74,7 @@ pub fn maximize_text_quality(img_np: &Mat) -> Result<Mat> {
 
     let mut normalized = Mat::default();
 
-    opencv::core::divide2(
-        &gray,
-        &background_blur,
-        &mut normalized,
-        255.0,
-        -1,
-    )?;
+    opencv::core::divide2(&gray, &background_blur, &mut normalized, 255.0, -1)?;
 
     debug!("Applying bilateral filter to reduce paper grain and noise... (5/8)");
 
@@ -247,10 +241,22 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
                 let sum = pt.x + pt.y;
                 let diff = pt.y - pt.x;
 
-                if sum < min_sum { min_sum = sum; tl = *pt; }
-                if sum > max_sum { max_sum = sum; br = *pt; }
-                if diff < min_diff { min_diff = diff; tr = *pt; }
-                if diff > max_diff { max_diff = diff; bl = *pt; }
+                if sum < min_sum {
+                    min_sum = sum;
+                    tl = *pt;
+                }
+                if sum > max_sum {
+                    max_sum = sum;
+                    br = *pt;
+                }
+                if diff < min_diff {
+                    min_diff = diff;
+                    tr = *pt;
+                }
+                if diff > max_diff {
+                    max_diff = diff;
+                    bl = *pt;
+                }
             }
 
             let w_a = ((br.x - bl.x).powi(2) + (br.y - bl.y).powi(2)).sqrt();
@@ -270,11 +276,7 @@ pub fn crop_to_receipt(img_np: &Mat) -> Result<Mat> {
                 Point2f::new(0.0, (max_h - 1) as f32),
             ]);
 
-            let m = imgproc::get_perspective_transform(
-                &src_pts,
-                &dst_pts,
-                DECOMP_LU,
-            )?;
+            let m = imgproc::get_perspective_transform(&src_pts, &dst_pts, DECOMP_LU)?;
 
             let mut warped = Mat::default();
 
@@ -310,7 +312,7 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat, config: &BonsaiOptions) ->
         &mut img_rgb,
         imgproc::COLOR_BGR2RGB,
         0,
-        AlgorithmHint::ALGO_HINT_APPROX
+        AlgorithmHint::ALGO_HINT_APPROX,
     )?;
 
     let cropped_rgb = crop_to_receipt(&img_rgb)?;
@@ -342,7 +344,10 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat, config: &BonsaiOptions) ->
 
         let new_size = final_rgb.size()?;
 
-        debug!("Image successfully scaled down to {}x{} (2/6)", new_size.width, new_size.height);
+        debug!(
+            "Image successfully scaled down to {}x{} (2/6)",
+            new_size.width, new_size.height
+        );
     } else {
         debug!("Image size within limits, skipping downscale step (2/6)");
     }
@@ -366,14 +371,9 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat, config: &BonsaiOptions) ->
 
     debug!("Writing preprocessed visualization matrix to disk... (4/6)");
 
-    imgcodecs::imwrite(
-        &debug_out_path,
-        &final_bgr,
-        &Vector::new()
-    )?;
+    imgcodecs::imwrite(&debug_out_path, &final_bgr, &Vector::new())?;
 
     debug!("Preprocessed debug image saved to {} (4/6)", debug_out_path);
-
     debug!("Encoding optimized matrix to high-quality JPEG binary buffer... (5/6)");
 
     let mut buffer = Vector::<u8>::new();
@@ -382,12 +382,7 @@ pub fn process_image_pipeline_from_mat(img_bgr: &Mat, config: &BonsaiOptions) ->
     params.push(imgcodecs::IMWRITE_JPEG_QUALITY);
     params.push(90);
 
-    imgcodecs::imencode(
-        ".jpg",
-        &final_bgr,
-        &mut buffer,
-        &params
-    )?;
+    imgcodecs::imencode(".jpg", &final_bgr, &mut buffer, &params)?;
 
     debug!("Converting binary JPEG stream to Base64 string... (6/6)");
 

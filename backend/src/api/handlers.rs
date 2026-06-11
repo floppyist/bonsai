@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::Path;
-use axum::response::IntoResponse;
-use axum::http::StatusCode;
-use axum::extract::State;
 use axum::body::Bytes;
+use axum::extract::Path;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
 
 use log::error;
 
@@ -13,25 +13,32 @@ use sqlx::Row;
 
 use super::models::FinalizeReceiptPayload;
 use crate::api::categories::ProductCategory;
-use crate::{AppState, util};
 use crate::api::models::RevalidateReceiptPayload;
 use crate::ocr;
+use crate::{AppState, util};
 
 pub async fn upload_receipt(
     State(state): State<Arc<AppState>>,
-    body_bytes: Bytes
+    body_bytes: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-
     let receipt_struct = match ocr::run_ocr_pipeline(&body_bytes, &state.config).await {
         Ok(r) => r,
         Err(err) => {
             error!("OCR Pipeline failed: {:?}", err);
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("OCR Pipeline error: {}", err)));
+
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("OCR Pipeline error: {}", err),
+            ));
         }
     };
 
-    let mut receipt_val: serde_json::Value = serde_json::to_value(receipt_struct)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to serialize OCR response: {}", e)))?;
+    let mut receipt_val: serde_json::Value = serde_json::to_value(receipt_struct).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to serialize OCR response: {}", e),
+        )
+    })?;
 
     let extracted_retailer = receipt_val
         .get("retailer")
@@ -40,10 +47,8 @@ pub async fn upload_receipt(
                 Some(v.to_string())
             } else if let Some(a) = r.get("address").and_then(|a| a.as_str()) {
                 Some(a.to_string())
-            } else if let Some(s) = r.as_str() {
-                Some(s.to_string())
             } else {
-                None
+                r.as_str().map(|s| s.to_string())
             }
         })
         .unwrap_or_default()
@@ -51,97 +56,42 @@ pub async fn upload_receipt(
         .to_string();
 
     if !extracted_retailer.is_empty() {
-        if let Some(articles_array) = receipt_val.get_mut("articles").and_then(|a| a.as_array_mut()) {
+        let articles = receipt_val.get_mut("articles").and_then(|a| a.as_array_mut());
+
+        if let Some(articles_array) = articles {
+
             for article in articles_array {
                 if let Some(raw_name) = article.get("name").and_then(|n| n.as_str()) {
-
                     let clean_name = util::clean_ocr_name(raw_name);
-                    if clean_name.is_empty() { continue; }
+
+                    if clean_name.is_empty() {
+                        continue;
+                    }
 
                     article["raw_ocr_name"] = serde_json::json!(clean_name);
 
-                    let mut matched_data = None;
-
-                    let variant_match = sqlx::query(
-                        "SELECT ep.name, ep.category, ep.brand, ep.ean \
-                            FROM ean_ocr_variants v \
-                            JOIN ean_products ep ON v.ean = ep.ean \
-                            WHERE REPLACE(v.retailer, ' ', '') = REPLACE(?, ' ', '') COLLATE NOCASE \
-                            AND REPLACE(v.raw_ocr_name, ' ', '') = REPLACE(?, ' ', '') COLLATE NOCASE \
-                            LIMIT 1"
+                    let matched_data = crate::db::resolve_article_metadata(
+                        &state.ean_db,
+                        &state.user_db,
+                        &extracted_retailer,
+                        &clean_name,
                     )
-                        .bind(&extracted_retailer)
-                        .bind(&clean_name)
-                        .fetch_optional(&state.ean_db)
                         .await
                         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-                    if let Some(row) = variant_match {
-                        let db_category: ProductCategory = row.get("category");
-                        matched_data = Some((
-                            row.get::<String, _>("name"),
-                            db_category,
-                            row.get::<String, _>("brand"),
-                            Some(row.get::<String, _>("ean"))
-                        ));
-                    } else {
-                        let history_match = sqlx::query(
-                            "SELECT p.name, p.category, p.brand, p.ean \
-                                FROM products p \
-                                JOIN receipt_items ri ON ri.product_id = p.id \
-                                JOIN receipts r ON ri.receipt_id = r.id \
-                                WHERE TRIM(p.name) = ? COLLATE NOCASE \
-                                AND TRIM(r.retailer) = ? COLLATE NOCASE \
-                                AND p.is_deleted = 0 \
-                                LIMIT 1"
-                        )
-                            .bind(&clean_name)
-                            .bind(&extracted_retailer)
-                            .fetch_optional(&state.user_db)
-                            .await
-                            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    if let Some(data) = matched_data {
+                        article["name"] = serde_json::json!(data.name);
+                        article["category"] = serde_json::json!(data.category);
 
-                        if let Some(row) = history_match {
-                            let db_category: ProductCategory = row.get("category");
-                            matched_data = Some((
-                                row.get::<String, _>("name"),
-                                db_category,
-                                row.get::<String, _>("brand"),
-                                row.get::<Option<String>, _>("ean")
-                            ));
-                        } else {
-                            let ean_match = sqlx::query(
-                                "SELECT name, category, brand, ean FROM ean_products \
-                                    WHERE TRIM(name) = ? COLLATE NOCASE \
-                                    LIMIT 1"
-                            )
-                                .bind(&clean_name)
-                                .fetch_optional(&state.ean_db)
-                                .await
-                                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-                            if let Some(row) = ean_match {
-                                let db_category: ProductCategory = row.get("category");
-                                matched_data = Some((
-                                    row.get::<String, _>("name"),
-                                    db_category,
-                                    row.get::<String, _>("brand"),
-                                    Some(row.get::<String, _>("ean"))
-                                ));
-                            }
+                        if data.brand != "UNKNOWN" && !data.brand.trim().is_empty() {
+                            article["brand"] = serde_json::json!(data.brand);
                         }
-                    }
 
-                    if let Some((db_name, db_category, db_brand, db_ean)) = matched_data {
-                        article["name"] = serde_json::json!(db_name);
-                        article["category"] = serde_json::json!(db_category);
+                        if let Some(ref ean_code) = data.ean
+                        && article.get("ean").and_then(|e| e.as_str()).is_none() {
+                            article["ean"] = serde_json::json!(util::sanitize_ean(ean_code));
+                        }
 
-                        if db_brand != "UNKNOWN" && !db_brand.trim().is_empty() {
-                            article["brand"] = serde_json::json!(db_brand);
-                        }
-                        if article.get("ean").and_then(|e| e.as_str()).is_none() && db_ean.is_some() {
-                            article["ean"] = serde_json::json!(util::sanitize_ean(&db_ean.unwrap()));
-                        }
                     }
                 }
             }
@@ -155,29 +105,24 @@ pub async fn lookup_ean(
     State(state): State<Arc<AppState>>,
     Path(ean): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-
     let clean_ean = util::sanitize_ean(&ean);
 
-    let result = sqlx::query("SELECT name, category, brand FROM ean_products WHERE ean = ?")
-        .bind(&clean_ean)
-        .fetch_optional(&state.ean_db)
+    let db_result = crate::db::fetch_product_by_ean(&state.ean_db, &clean_ean)
         .await
-        .map_err(|e| {
-            error!("Database error during EAN lookup for {}: {}", clean_ean, e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Internal databases error".to_string())
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal database error".to_string(),
+            )
         })?;
 
-    match result {
-        Some(row) => {
-            let product_name: String = row.get("name");
-            let category: String = row.try_get("category").unwrap_or_else(|_| "UNCATEGORIZED".to_string());
-            let brand: String = row.try_get("brand").unwrap_or_else(|_| "UNKNOWN".to_string());
-
+    match db_result {
+        Some(product) => {
             let response = serde_json::json!({
                 "ean": clean_ean,
-                "name": product_name,
-                "category": category,
-                "brand": if brand.trim().is_empty() { "UNKNOWN".to_string() } else { brand },
+                "name": product.name,
+                "category": product.category,
+                "brand": if product.brand.trim().is_empty() { "UNKNOWN".to_string() } else { product.brand },
                 "found": true
             });
 
@@ -201,14 +146,15 @@ pub async fn finalize_receipt(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<FinalizeReceiptPayload>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-
     let user_db = &state.user_db;
-    let mut tx = user_db.begin().await
+
+    let mut tx = user_db
+        .begin()
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let receipt_row = sqlx::query(
-        "INSERT INTO receipts (retailer, receipt_date) VALUES (?, ?) RETURNING id"
-    )
+    let receipt_row =
+    sqlx::query("INSERT INTO receipts (retailer, receipt_date) VALUES (?, ?) RETURNING id")
         .bind(&payload.retailer)
         .bind(&payload.receipt_date)
         .fetch_one(&mut *tx)
@@ -236,7 +182,11 @@ pub async fn finalize_receipt(
 
             if let Some(r) = row {
                 product_id = Some(r.get("id"));
-                existing_ean = r.get::<Option<String>, _>("ean").map(|e| util::sanitize_ean(&e));
+
+                existing_ean = r
+                    .get::<Option<String>, _>("ean")
+                    .map(|e| util::sanitize_ean(&e));
+
                 existing_category = r.get("category");
                 existing_brand = r.get("brand");
             }
@@ -253,7 +203,11 @@ pub async fn finalize_receipt(
 
             if let Some(r) = row {
                 product_id = Some(r.get("id"));
-                existing_ean = r.get::<Option<String>, _>("ean").map(|e| util::sanitize_ean(&e));
+
+                existing_ean = r
+                    .get::<Option<String>, _>("ean")
+                    .map(|e| util::sanitize_ean(&e));
+
                 existing_category = r.get("category");
                 existing_brand = r.get("brand");
             }
@@ -262,10 +216,20 @@ pub async fn finalize_receipt(
         let final_product_id = match product_id {
             Some(id) => {
                 let need_ean_update = existing_ean.is_none() && clean_article_ean.is_some();
-                let need_category_update = existing_category == ProductCategory::Uncategorized && article.category != ProductCategory::Uncategorized;
 
-                let clean_existing = existing_brand.trim().to_uppercase().replace('\'', "").replace('"', "");
-                let clean_incoming = article.brand.trim().to_uppercase().replace('\'', "").replace('"', "");
+                let need_category_update = existing_category == ProductCategory::Uncategorized
+                && article.category != ProductCategory::Uncategorized;
+
+                let clean_existing = existing_brand
+                    .trim()
+                    .to_uppercase()
+                    .replace(['\'', '"'], "");
+
+                let clean_incoming = article
+                    .brand
+                    .trim()
+                    .to_uppercase()
+                    .replace(['\'', '"'], "");
 
                 let is_existing_unknown = clean_existing == "UNKNOWN" || clean_existing.is_empty();
                 let is_incoming_valid = clean_incoming != "UNKNOWN" && !clean_incoming.is_empty();
@@ -274,10 +238,20 @@ pub async fn finalize_receipt(
 
                 if need_ean_update || need_category_update || need_brand_update {
                     let target_ean = clean_article_ean.as_ref().or(existing_ean.as_ref());
-                    let target_category = if need_category_update { article.category } else { existing_category };
-                    let target_brand = if need_brand_update { &article.brand } else { &existing_brand };
+                    let target_category = if need_category_update {
+                        article.category
+                    } else {
+                        existing_category
+                    };
+                    let target_brand = if need_brand_update {
+                        &article.brand
+                    } else {
+                        &existing_brand
+                    };
 
-                    sqlx::query("UPDATE products SET ean = ?, category = ?, brand = ? WHERE id = ?")
+                    sqlx::query(
+                        "UPDATE products SET ean = ?, category = ?, brand = ? WHERE id = ?",
+                    )
                         .bind(target_ean)
                         .bind(target_category)
                         .bind(target_brand)
@@ -287,7 +261,7 @@ pub async fn finalize_receipt(
                         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
                 }
                 id
-            },
+            }
             None => {
                 let new_product_row = sqlx::query(
                     "INSERT INTO products (name, ean, category, brand) VALUES (?, ?, ?, ?) RETURNING id"
@@ -317,43 +291,45 @@ pub async fn finalize_receipt(
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-        if let Some(ref ean_code) = clean_article_ean {
-            if !ean_code.trim().is_empty() {
-                if let Err(e) = sqlx::query(
-                    "INSERT OR IGNORE INTO ean_products (ean, name, category, brand) VALUES (?, ?, ?, ?)"
+        if let Some(ref ean_code) = clean_article_ean
+        && !ean_code.trim().is_empty() {
+            if let Err(e) = sqlx::query(
+                "INSERT OR IGNORE INTO ean_products (ean, name, category, brand) VALUES (?, ?, ?, ?)"
+            )
+                .bind(ean_code)
+                .bind(&article.name)
+                .bind(article.category)
+                .bind(&article.brand)
+                .execute(&state.ean_db)
+            .await
+            {
+                error!("Konnte ean_products nicht aktualisieren: {}", e);
+            }
+
+            let cleaned_ocr_field = util::clean_ocr_name(&article.raw_ocr_name);
+
+            if !cleaned_ocr_field.is_empty() {
+                let query_result = sqlx::query(
+                    "INSERT INTO ean_ocr_variants (ean, retailer, raw_ocr_name, confirmed_count) \
+                        VALUES (?, ?, ?, 1) \
+                        ON CONFLICT(ean, retailer, raw_ocr_name) \
+                        DO UPDATE SET confirmed_count = confirmed_count + 1, updated_at = CURRENT_TIMESTAMP"
                 )
                     .bind(ean_code)
-                    .bind(&article.name)
-                    .bind(article.category.clone())
-                    .bind(&article.brand)
+                    .bind(&payload.retailer)
+                    .bind(&cleaned_ocr_field)
                     .execute(&state.ean_db)
-                .await
-                {
-                    error!("Konnte ean_products nicht aktualisieren: {}", e);
-                }
+                .await;
 
-                let cleaned_ocr_field = util::clean_ocr_name(&article.raw_ocr_name);
-                if !cleaned_ocr_field.is_empty() {
-                    if let Err(e) = sqlx::query(
-                        "INSERT INTO ean_ocr_variants (ean, retailer, raw_ocr_name, confirmed_count) \
-                            VALUES (?, ?, ?, 1) \
-                            ON CONFLICT(ean, retailer, raw_ocr_name) \
-                            DO UPDATE SET confirmed_count = confirmed_count + 1, updated_at = CURRENT_TIMESTAMP"
-                    )
-                        .bind(ean_code)
-                        .bind(&payload.retailer)
-                        .bind(&cleaned_ocr_field)
-                        .execute(&state.ean_db)
-                    .await
-                    {
-                        error!("Konnte ean_ocr_variants Wörterbuch-Eintrag nicht updaten/einfügen: {}", e);
-                    }
+                if let Err(e) = query_result {
+                    error!("Konnte ean_ocr_variants Wörterbuch-Eintrag nicht updaten/einfügen: {}", e);
                 }
             }
         }
     }
 
-    tx.commit().await
+    tx.commit()
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(StatusCode::CREATED)
@@ -362,7 +338,6 @@ pub async fn finalize_receipt(
 pub async fn get_pantry_summary(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-
     let rows = sqlx::query(
         "SELECT p.category, SUM(ri.quantity) as total_quantity, CAST(SUM(ri.price * ri.quantity) AS INTEGER) as total_price_cents \
             FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 GROUP BY p.category"
@@ -372,6 +347,7 @@ pub async fn get_pantry_summary(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut summary = serde_json::json!([]);
+
     for row in rows {
         let category: String = row.get("category");
         let total_quantity: f64 = row.get("total_quantity");
@@ -383,13 +359,13 @@ pub async fn get_pantry_summary(
             "total_price": (total_price_cents as f64) / 100.0
         }));
     }
+
     Ok(Json(summary))
 }
 
 pub async fn get_pantry_items(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-
     let rows = sqlx::query(
         "SELECT p.name, p.brand, p.category, SUM(ri.quantity) as quantity, CAST(ri.price AS REAL) / 100.0 as unit_price \
             FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 GROUP BY p.name, p.brand, p.category, ri.price"
@@ -399,6 +375,7 @@ pub async fn get_pantry_items(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut items = serde_json::json!([]);
+
     for row in rows {
         let name: String = row.get("name");
         let brand: String = row.get("brand");
@@ -421,7 +398,6 @@ pub async fn revalidate_articles(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RevalidateReceiptPayload>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-
     let mut articles = payload.articles;
     let retailer = payload.retailer.trim();
 
@@ -434,7 +410,10 @@ pub async fn revalidate_articles(
             };
 
             let clean_name = util::clean_ocr_name(source_name);
-            if clean_name.is_empty() { continue; }
+
+            if clean_name.is_empty() {
+                continue;
+            }
 
             let mut matched_data = None;
 
@@ -444,7 +423,7 @@ pub async fn revalidate_articles(
                     JOIN ean_products ep ON v.ean = ep.ean \
                     WHERE REPLACE(v.retailer, ' ', '') = REPLACE(?, ' ', '') COLLATE NOCASE \
                     AND REPLACE(v.raw_ocr_name, ' ', '') = REPLACE(?, ' ', '') COLLATE NOCASE \
-                    LIMIT 1"
+                    LIMIT 1",
             )
                 .bind(retailer)
                 .bind(&clean_name)
@@ -454,11 +433,12 @@ pub async fn revalidate_articles(
 
             if let Some(row) = variant_match {
                 let db_category: ProductCategory = row.get("category");
+
                 matched_data = Some((
                     row.get::<String, _>("name"),
                     db_category,
                     row.get::<String, _>("brand"),
-                    Some(row.get::<String, _>("ean"))
+                    Some(row.get::<String, _>("ean")),
                 ));
             } else {
                 let history_match = sqlx::query(
@@ -469,7 +449,7 @@ pub async fn revalidate_articles(
                         WHERE TRIM(p.name) = ? COLLATE NOCASE \
                         AND TRIM(r.retailer) = ? COLLATE NOCASE \
                         AND p.is_deleted = 0 \
-                        LIMIT 1"
+                        LIMIT 1",
                 )
                     .bind(&clean_name)
                     .bind(retailer)
@@ -477,22 +457,26 @@ pub async fn revalidate_articles(
                     .await
                     .map_err(|e| {
                         error!("Database error during historical revalidation: {}", e);
-                        (StatusCode::INTERNAL_SERVER_ERROR, "Internal database error".to_string())
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Internal database error".to_string(),
+                        )
                     })?;
 
                 if let Some(row) = history_match {
                     let db_category: ProductCategory = row.get("category");
+
                     matched_data = Some((
                         row.get::<String, _>("name"),
                         db_category,
                         row.get::<String, _>("brand"),
-                        row.get::<Option<String>, _>("ean")
+                        row.get::<Option<String>, _>("ean"),
                     ));
                 } else {
                     let ean_match = sqlx::query(
                         "SELECT name, category, brand, ean FROM ean_products \
                             WHERE TRIM(name) = ? COLLATE NOCASE \
-                            LIMIT 1"
+                            LIMIT 1",
                     )
                         .bind(&clean_name)
                         .fetch_optional(&state.ean_db)
@@ -501,11 +485,12 @@ pub async fn revalidate_articles(
 
                     if let Some(row) = ean_match {
                         let db_category: ProductCategory = row.get("category");
+
                         matched_data = Some((
                             row.get::<String, _>("name"),
                             db_category,
                             row.get::<String, _>("brand"),
-                            Some(row.get::<String, _>("ean"))
+                            Some(row.get::<String, _>("ean")),
                         ));
                     }
                 }

@@ -1,8 +1,5 @@
 pub fn sanitize_ean(ean: &str) -> String {
-    ean.trim()
-        .trim_matches('\'')
-        .trim_matches('"')
-        .to_string()
+    ean.trim().trim_matches('\'').trim_matches('"').to_string()
 }
 
 pub fn clean_ocr_name(raw_name: &str) -> String {

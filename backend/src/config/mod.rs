@@ -1,7 +1,7 @@
 use std::fs;
 
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct BonsaiOptions {
@@ -14,8 +14,7 @@ pub struct BonsaiOptions {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct GeneralOptions {
-}
+pub struct GeneralOptions {}
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct PreprocessingOptions {
@@ -56,8 +55,7 @@ pub struct TlsOptions {
 impl Default for BonsaiOptions {
     fn default() -> Self {
         Self {
-            general: GeneralOptions {
-            },
+            general: GeneralOptions {},
             preprocessing: PreprocessingOptions {
                 debug_dir: "target/debug_output".to_string(),
             },
@@ -80,7 +78,7 @@ impl Default for BonsaiOptions {
                 ean_db_url: "sqlite://db/ean.db".to_string(),
                 ean_db_max_pool_connections: 5,
             },
-            tls: TlsOptions { 
+            tls: TlsOptions {
                 cert_path: "certs/server.crt".to_string(),
                 key_path: "certs/server.key".to_string(),
             },
@@ -105,4 +103,3 @@ impl BonsaiOptions {
         }
     }
 }
-

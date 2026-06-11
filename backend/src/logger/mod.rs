@@ -57,4 +57,3 @@ pub fn setup_logging(options: &BonsaiOptions) -> Result<(), InitError> {
 
     Ok(())
 }
-

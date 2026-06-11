@@ -1,8 +1,8 @@
+mod api;
 mod config;
+mod db;
 mod logger;
 mod ocr;
-mod db;
-mod api;
 mod util;
 
 use axum::routing::get;
@@ -11,8 +11,8 @@ use std::process::exit;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::post;
 use axum::extract::DefaultBodyLimit;
+use axum::routing::post;
 use axum_server::tls_rustls::RustlsConfig;
 
 use log::error;
@@ -46,6 +46,7 @@ async fn main() {
         Ok(p) => p,
         Err(_) => {
             error!("Database could not be initialized. Exiting.");
+
             exit(1);
         }
     };
@@ -63,10 +64,19 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/upload-receipt", post(api::handlers::upload_receipt))
-        .route("/api/receipt/revalidate", post(api::handlers::revalidate_articles))
+        .route(
+            "/api/receipt/revalidate",
+            post(api::handlers::revalidate_articles),
+        )
         .route("/api/ean/{ean}", get(api::handlers::lookup_ean))
-        .route("/api/finalize-receipt", post(api::handlers::finalize_receipt))
-        .route("/api/pantry/summary", get(api::handlers::get_pantry_summary))
+        .route(
+            "/api/finalize-receipt",
+            post(api::handlers::finalize_receipt),
+        )
+        .route(
+            "/api/pantry/summary",
+            get(api::handlers::get_pantry_summary),
+        )
         .route("/api/pantry/items", get(api::handlers::get_pantry_items))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
@@ -76,6 +86,7 @@ async fn main() {
         Ok(config) => config,
         Err(e) => {
             error!("Failed to load TLS certificates: {}", e);
+
             exit(1);
         }
     };
@@ -88,9 +99,10 @@ async fn main() {
         .serve(app.into_make_service())
         .await
     {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             error!("Error serving backend: '{}':", e);
+
             exit(1);
         }
     }

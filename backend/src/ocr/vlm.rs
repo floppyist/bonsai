@@ -1,5 +1,5 @@
-use anyhow::Result;
 use anyhow::Context;
+use anyhow::Result;
 use log::error;
 use log::info;
 
@@ -58,7 +58,8 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
 
     let client = reqwest::Client::new();
 
-    let res = client.post(url)
+    let res = client
+        .post(url)
         .json(&request_body)
         .send()
         .await
@@ -72,16 +73,25 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
         .context("Failed to read response body as text from Ollama")?;
 
     if !status.is_success() {
-        error!("Ollama API returned error status {}: {}", status, response_text);
+        error!(
+            "Ollama API returned error status {}: {}",
+            status, response_text
+        );
 
-        return Err(anyhow::anyhow!("Ollama error (Status {}): {}", status, response_text));
+        return Err(anyhow::anyhow!(
+            "Ollama error (Status {}): {}",
+            status,
+            response_text
+        ));
     }
 
-    let response_json: OllamaResponse = serde_json::from_str(&response_text)
-        .with_context(|| format!(
-            "Failed to deserialize JSON response into OllamaResponse. Raw body was: '{}'", 
+    let response_json: OllamaResponse =
+    serde_json::from_str(&response_text).with_context(|| {
+        format!(
+            "Failed to deserialize JSON response into OllamaResponse. Raw body was: '{}'",
             response_text
-        ))?;
+        )
+    })?;
 
     Ok(response_json.message.content)
 }
