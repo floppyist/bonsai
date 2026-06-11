@@ -86,12 +86,12 @@ pub async fn run_vlm_analysis(b64_image: &str, config: &BonsaiOptions) -> Result
     }
 
     let response_json: OllamaResponse =
-    serde_json::from_str(&response_text).with_context(|| {
-        format!(
-            "Failed to deserialize JSON response into OllamaResponse. Raw body was: '{}'",
-            response_text
-        )
-    })?;
+        serde_json::from_str(&response_text).with_context(|| {
+            format!(
+                "Failed to deserialize JSON response into OllamaResponse. Raw body was: '{}'",
+                response_text
+            )
+        })?;
 
     Ok(response_json.message.content)
 }
