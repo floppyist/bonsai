@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useBonsaiStore } from '../stores/BonsaiStore.js'
+
 import ReceiptHeader from '../components/ReceiptHeader.vue'
 import ReceiptArticleRow from '../components/ReceiptArticleRow.vue'
 import ReceiptSummary from '../components/ReceiptSummary.vue'
@@ -15,13 +16,29 @@ const props = defineProps({
 const emit = defineEmits(['startEanScanner', 'saveAndCloseReceipt'])
 
 const store = useBonsaiStore()
+
+const showEanInput = ref(false);
+const eanInputIndex = ref(null);
+const eanInputValue = ref('');
+const eanInputRef = ref(null);
+
 const activeEditIndex = ref(null)
 
 const manuallyEnterEan = (index) => {
-  const input = prompt('Bitte EAN-Barcode manuell eingeben:', store.currentReceipt.articles[index]?.ean || '')
-  if (input !== null && input.trim()) {
-    store.lookupEanForArticle(index, input.trim())
+  eanInputIndex.value = index
+  eanInputValue.value = store.currentReceipt.articles[index]?.ean || ''
+  showEanInput.value = true
+  nextTick(() => eanInputRef.value?.focus())
+}
+
+const confirmEanInput = () => {
+  if (eanInputValue.value.trim()) {
+    store.lookupEanForArticle(eanInputIndex.value, eanInputValue.value.trim())
   }
+
+  showEanInput.value = false
+  eanInputIndex.value = null
+  eanInputValue.value = ''
 }
 
 const handleSave = async () => {
@@ -90,6 +107,24 @@ const handleSave = async () => {
       :formatPrice="formatPrice"
       @save="handleSave"
     />
+
+    <div v-if="showEanInput"
+      class="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+      @click.self="showEanInput = false">
+      <div class="bg-white rounded-2xl p-5 shadow-xl mx-4 w-full max-w-sm">
+        <h3 class="text-sm font-bold text-[#2D3A34] mb-3">EAN-Code eingeben</h3>
+        <input ref="eanInputRef" v-model="eanInputValue"
+          type="text" inputmode="numeric"
+          placeholder="z.B. 4012345678900"
+          class="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm mb-3 outline-none focus:border-[#2D6A4F]"
+          @keydown.enter="confirmEanInput"
+          @keydown.escape="showEanInput = false" />
+        <div class="flex gap-2">
+          <button @click="showEanInput = false" class="flex-1 py-2.5 text-sm font-medium text-zinc-500 bg-zinc-100 rounded-xl cursor-pointer">Abbrechen</button>
+          <button @click="confirmEanInput" class="flex-1 py-2.5 text-sm font-medium text-white bg-[#2D6A4F] rounded-xl cursor-pointer">Bestätigen</button>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>

@@ -66,7 +66,7 @@ pub async fn upload_receipt(
 
                     article["raw_ocr_name"] = serde_json::json!(clean_name);
 
-                    /* Execute the clean 3-tier matching layer from the database module */
+                    // Execute the clean 3-tier matching layer from the database module
                     let matched_data = crate::db::resolve_article_metadata(
                         &state.ean_db,
                         &state.user_db,
@@ -213,7 +213,7 @@ pub async fn revalidate_articles(
                 continue;
             }
 
-            /* Utilizes the exact same decoupled core cascading database matching pipeline */
+            // Utilizes the exact same decoupled core cascading database matching pipeline
             let matched_data = crate::db::resolve_article_metadata(
                 &state.ean_db,
                 &state.user_db,

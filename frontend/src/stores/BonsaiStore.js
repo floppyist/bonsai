@@ -3,11 +3,7 @@ import { defineStore } from 'pinia'
 export const useBonsaiStore = defineStore('bonsai', {
   state: () => ({
     isDevMode: false,
-
-    receiptsHistory: [
-      { id: 1, retailer: 'Rewe Markt', date: '2026-06-08', itemCount: 5, totalAmount: 24.50 }
-    ],
-
+    receiptsHistory: [],
     pantryItems: [],
 
     currentReceipt: {
@@ -237,8 +233,7 @@ export const useBonsaiStore = defineStore('bonsai', {
 
         this.currentReceipt = { retailer: '', date: '', articles: [], scannedTotalAmount: null }
         return true
-      } catch (error) {
-        alert('Speichern fehlgeschlagen: ' + error.message)
+      } catch {
         return false
       } finally {
         this.isSubmittingReceipt = false

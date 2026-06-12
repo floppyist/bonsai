@@ -60,7 +60,7 @@ impl Default for BonsaiOptions {
     fn default() -> Self {
         Self {
             general: GeneralOptions {
-                ip: "0.0.0.0".parse().unwrap(),
+                ip: "0.0.0.0".parse().expect("Invalid default IP: 0.0.0.0"),
                 port: 3000,
             },
 

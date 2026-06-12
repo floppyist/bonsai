@@ -1,5 +1,6 @@
 use core::fmt;
 
+#[derive(Debug)]
 pub enum DBError {
     Creation,
     Migration,
@@ -17,3 +18,5 @@ impl fmt::Display for DBError {
         }
     }
 }
+
+impl std::error::Error for DBError {}

@@ -1,9 +1,26 @@
 <script setup>
+import { computed } from 'vue'
+import { useBonsaiStore } from '../stores/BonsaiStore.js'
+
 defineProps({
   isProcessingInBackground: Boolean
-})
+});
 
-defineEmits(['bringOverlayToForeground'])
+defineEmits(['bringOverlayToForeground']);
+
+const store = useBonsaiStore();
+
+const totalProducts = computed(() => store.pantryItems.length);
+
+const monthlySpend = computed(() => {
+  const thisMonth = new Date().toISOString().slice(0, 7);
+
+  const total = store.receiptsHistory
+    .filter(r => r.date?.startsWith(thisMonth))
+    .reduce((sum, r) => sum + (r.totalAmount || 0), 0);
+
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(total)
+})
 </script>
 
 <template>
@@ -35,26 +52,19 @@ defineEmits(['bringOverlayToForeground'])
       </div>
     </div>
 
-    <div class="grid grid-cols-3 gap-2.5">
+    <div class="grid grid-cols-2 gap-2.5">
       <div class="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col gap-1">
         <span class="text-lg">🥑</span>
         <div class="flex flex-col">
-          <span class="text-sm font-bold">24</span>
+          <span class="text-sm font-bold">{{ totalProducts }}</span>
           <span class="text-[10px] text-white/70">Produkte</span>
-        </div>
-      </div>
-      <div class="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col gap-1">
-        <span class="text-lg">⏳</span>
-        <div class="flex flex-col">
-          <span class="text-sm font-bold text-red-300">3</span>
-          <span class="text-[10px] text-white/70">Ablaufend</span>
         </div>
       </div>
       <div class="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col gap-1">
         <span class="text-lg">💶</span>
         <div class="flex flex-col">
-          <span class="text-sm font-bold text-[#CCFF33]">42,50 €</span>
-          <span class="text-[10px] text-white/70">März-Log</span>
+          <span class="text-sm font-bold text-[#CCFF33]">{{ monthlySpend }}</span>
+          <span class="text-[10px] text-white/70">Monat</span>
         </div>
       </div>
     </div>

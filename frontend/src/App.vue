@@ -60,7 +60,6 @@ const handleFileUpload = (event) => {
 
   showOverlay.value = true;
   isProcessingInBackground.value = true;
-  scanStep.value = 1;
   scanStep.value = 2;
 
   if (isDevMode.value) {
@@ -101,7 +100,6 @@ const handleFileUpload = (event) => {
 
     if (error) {
       console.error('Error while uploading receipt: ', error);
-      alert(error);
       showOverlay.value = false;
       isProcessingInBackground.value = false;
     } else {
@@ -163,7 +161,6 @@ const initializeQrScanner = async (videoElement) => {
     );
   } catch (err) {
     console.error("Kamera-Setup fehlgeschlagen:", err);
-    alert(`Fehler beim Starten der Kamera: ${err.message}`);
     showEanModal.value = false;
   }
 };
