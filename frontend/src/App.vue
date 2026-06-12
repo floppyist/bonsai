@@ -57,12 +57,17 @@ const formatPrice = (price) => {
 };
 
 const triggerCamera = () => {
-  if (fileInput.value) fileInput.value.click()
+  if (isDevMode.value) {
+    handleFileUpload();
+  } else if (fileInput.value) {
+    fileInput.value.click();
+  }
 }
 
 const handleFileUpload = (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
+  const file = event?.target?.files?.[0];
+
+  if (!file && !isDevMode.value) return;
 
   showOverlay.value = true;
   isProcessingInBackground.value = true;
@@ -70,18 +75,19 @@ const handleFileUpload = (event) => {
   receiptData.value = null;
   scanStep.value = 2;
 
-if (isDevMode.value) {
-  setTimeout(() => {
-    store.setReceiptData({
-      articles: MOCK_RECEIPT_DATA.items.map(item => ({
-        name: item.name,
-        raw_ocr_name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        ean: null
-      }))
-    });
-    scanStep.value = 3;
+  if (isDevMode.value) {
+    setTimeout(() => {
+      store.setReceiptData({
+        articles: MOCK_RECEIPT_DATA.items.map(item => ({
+          name: item.name,
+          raw_ocr_name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          ean: null,
+        }))
+      });
+
+      scanStep.value = 3;
 
       setTimeout(() => {
         showOverlay.value = false;
@@ -90,7 +96,7 @@ if (isDevMode.value) {
       }, 800);
     }, 1000);
 
-    event.target.value = '';
+    if (event?.target) event.target.value = '';
 
     return;
   }
