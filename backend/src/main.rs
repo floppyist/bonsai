@@ -57,6 +57,9 @@ async fn main() {
         ean_db: pools.ean_db,
     });
 
+    let ip = shared_state.config.general.ip;
+    let port = shared_state.config.general.port;
+
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -91,7 +94,7 @@ async fn main() {
         }
     };
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr = SocketAddr::from((ip, port));
 
     info!("bonsai backend runs on 'https://{}'", addr);
 
