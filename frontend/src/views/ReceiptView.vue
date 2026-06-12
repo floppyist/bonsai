@@ -17,31 +17,6 @@ const emit = defineEmits(['startEanScanner', 'saveAndCloseReceipt'])
 const store = useBonsaiStore()
 const activeEditIndex = ref(null)
 
-const categoriesList = [
-  { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
-  { value: 'DAIRY_EGGS', label: '🥛 Milchprodukte & Eier' },
-  { value: 'FRUIT_VEGETABLES', label: '🥦 Obst & Gemüse' },
-  { value: 'MEAT_FISH', label: '🥩 Fleisch, Fisch & Ersatz' },
-  { value: 'STAPLE_FOODS', label: '🍝 Grundnahrungsmittel' },
-  { value: 'CANNED_JARRED', label: '🥫 Konserven & Gläser' },
-  { value: 'OILS_SAUCES_SPICES', label: '🫚 Öle, Saucen & Gewürze' },
-  { value: 'BREAKFAST_SPREADS', label: '🍯 Frühstück & Aufstriche' },
-  { value: 'SNACKS_SWEETS', label: '🍫 Süßwaren & Knabberzeug' },
-  { value: 'BEVERAGES', label: '☕ Getränke' },
-  { value: 'DRUGSTORE_BEAUTY', label: '🧴 Drogerie & Kosmetik' },
-  { value: 'HOUSEHOLD_CLEANING', label: '🧹 Haushalt & Reinigung' },
-  { value: 'PET_SUPPLIES', label: '🐾 Haustierbedarf' },
-  { value: 'ELECTRONICS', label: '🔌 Elektronik & Zubehör' },
-  { value: 'STATIONERY_OFFICE', label: '✏️ Schreibwaren & Büro' },
-  { value: 'HOME_LIVING', label: '🍳 Wohnen & Küche' },
-  { value: 'CLOTHING_TEXTILES', label: '🧦 Kleidung & Textilien' },
-  { value: 'DIY_GARDEN', label: '🛠️ Baumarkt & Garten' },
-  { value: 'BOOKS_MEDIA', label: '📚 Medien & Freizeit' },
-  { value: 'UNCATEGORIZED', label: '❓ Unkategorisiert' }
-]
-
-const commonProductSuggestions = ['Obst & Gemüse', 'Molkereiprodukte', 'Brot & Backwaren', 'Getränke', 'Fleisch & Fisch', 'Snacks']
-
 if (props.receiptData) {
   store.setReceiptData(props.receiptData)
 }
@@ -87,8 +62,7 @@ const handleSave = async () => {
           :index="index"
           :isActive="activeEditIndex === index"
           :isDuplicate="item.ean ? store.currentReceipt.articles.filter(a => a.ean === item.ean).length > 1 : false"
-          :categoriesList="categoriesList"
-          :commonProductSuggestions="commonProductSuggestions"
+          :categoriesList="store.categoriesList"
           :formatPrice="formatPrice"
           @toggleEdit="activeEditIndex = activeEditIndex === index ? null : index"
           @updateQuantity="(idx, delta) => store.updateQuantity(idx, delta)"

@@ -19,6 +19,30 @@ export const useBonsaiStore = defineStore('bonsai', {
 
     isLoadingPantry: false,
     isSubmittingReceipt: false,
+
+    categoriesList: [
+      { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
+      { value: 'DAIRY_EGGS', label: '🥛 Milchprodukte & Eier' },
+      { value: 'FRUIT_VEGETABLES', label: '🥦 Obst & Gemüse' },
+      { value: 'MEAT_FISH', label: '🥩 Fleisch, Fisch & Ersatz' },
+      { value: 'STAPLE_FOODS', label: '🍝 Grundnahrungsmittel' },
+      { value: 'CANNED_JARRED', label: '🥫 Konserven & Gläser' },
+      { value: 'OILS_SAUCES_SPICES', label: '🫚 Öle, Saucen & Gewürze' },
+      { value: 'BREAKFAST_SPREADS', label: '🍯 Frühstück & Aufstriche' },
+      { value: 'SNACKS_SWEETS', label: '🍫 Süßwaren & Knabberzeug' },
+      { value: 'BEVERAGES', label: '☕ Getränke' },
+      { value: 'DRUGSTORE_BEAUTY', label: '🧴 Drogerie & Kosmetik' },
+      { value: 'HOUSEHOLD_CLEANING', label: '🧹 Haushalt & Reinigung' },
+      { value: 'PET_SUPPLIES', label: '🐾 Haustierbedarf' },
+      { value: 'ELECTRONICS', label: '🔌 Elektronik & Zubehör' },
+      { value: 'STATIONERY_OFFICE', label: '✏️ Schreibwaren & Büro' },
+      { value: 'HOME_LIVING', label: '🍳 Wohnen & Küche' },
+      { value: 'CLOTHING_TEXTILES', label: '🧦 Kleidung & Textilien' },
+      { value: 'DIY_GARDEN', label: '🛠️ Baumarkt & Garten' },
+      { value: 'BOOKS_MEDIA', label: '📚 Medien & Freizeit' },
+      { value: 'TOBACCO_ACCESSORIES', label: '🚬 Tabak & Zubehör' },
+      { value: 'UNCATEGORIZED', label: '❓ Unkategorisiert' },
+    ],
   }),
 
   getters: {
@@ -29,6 +53,7 @@ export const useBonsaiStore = defineStore('bonsai', {
         if (!summaryMap[item.category]) {
           summaryMap[item.category] = { total_quantity: 0, total_price: 0 }
         }
+
         summaryMap[item.category].total_quantity += item.quantity
         summaryMap[item.category].total_price += item.price
       })
@@ -45,29 +70,41 @@ export const useBonsaiStore = defineStore('bonsai', {
         (sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0
       )
     },
+
     isStoreInvalid: (state) => {
       const store = state.currentReceipt.retailer
+
       return !store || store.trim() === '' || store === 'Unbekannter Händler'
     },
+
     isDateInvalid: (state) => {
       const date = state.currentReceipt.date
+
       return !date || date.trim() === ''
     },
+
     isPriceInvalid: (state) => {
       return state.currentReceipt.articles.reduce((sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0) <= 0
     },
+
     isMissingEan: (state) => {
       return state.currentReceipt.articles.some(item => !item.ean)
     },
+
     hasDuplicateEan: (state) => {
       const eans = state.currentReceipt.articles.map(item => item.ean).filter(Boolean)
+
       return new Set(eans).size !== eans.length
     },
+
     hasAmountMismatch: (state) => {
       if (state.currentReceipt.scannedTotalAmount === null) return false
+
       const currentTotal = state.currentReceipt.articles.reduce((sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0)
+
       return state.currentReceipt.scannedTotalAmount.toFixed(2) !== currentTotal.toFixed(2)
     },
+
     isFormInvalid() {
       return this.isStoreInvalid || this.isDateInvalid || this.isPriceInvalid || this.isMissingEan || this.hasDuplicateEan
     }
@@ -78,7 +115,9 @@ export const useBonsaiStore = defineStore('bonsai', {
       this.isLoadingPantry = true
       try {
         const response = await fetch('/api/pantry/items')
+
         if (!response.ok) return
+
         this.pantryItems = await response.json()
       } catch (error) {
         console.error('Failed fetching pantry items:', error)
