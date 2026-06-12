@@ -91,6 +91,7 @@ if (isDevMode.value) {
     }, 1000);
 
     event.target.value = '';
+
     return;
   }
 
@@ -98,7 +99,7 @@ if (isDevMode.value) {
 
   worker.postMessage({
     file: file,
-    url: 'https://bonsai.pi:3000/api/upload-receipt'
+    url: '/api/upload-receipt'
   });
 
   worker.onmessage = (e) => {
@@ -229,6 +230,7 @@ const saveAndCloseReceipt = () => {
       </main>
 
       <input type="file" accept="image/*" ref="fileInput" @change="handleFileUpload" class="hidden" />
+
       <VisionOverlay :showOverlay="showOverlay" :scanStep="scanStep" @closeOverlay="showOverlay = false" />
 
       <EanScannerModal
