@@ -42,7 +42,7 @@ pub fn setup_logging(options: &BonsaiOptions) -> Result<(), InitError> {
     }
 
     if options.logging.file {
-        let log_file_path = format!("{}{}", options.logging.path, "fury.log");
+        let log_file_path = format!("{}bonsai.log", options.logging.path);
 
         let file_dispatch = Dispatch::new()
             .format(|out, message, record| {

@@ -165,7 +165,7 @@ where
     }
 }
 
-pub async fn run_ocr_pipeline(image_bytes: &[u8], config: &BonsaiOptions) -> Result<Receipt> {
+pub async fn run_ocr_pipeline(client: &reqwest::Client, image_bytes: &[u8], config: &BonsaiOptions) -> Result<Receipt> {
     info!("Starting OCR pipeline...");
 
     let vec_bytes = opencv::core::Vector::<u8>::from_iter(image_bytes.to_vec());
@@ -173,7 +173,7 @@ pub async fn run_ocr_pipeline(image_bytes: &[u8], config: &BonsaiOptions) -> Res
         .context("Failed to decode image bytes into OpenCV Mat")?;
 
     let b64_image = preprocessing::process_image_pipeline_from_mat(&img_bgr, config)?;
-    let vlm_json_output = vlm::run_vlm_analysis(&b64_image, config).await?;
+    let vlm_json_output = vlm::run_vlm_analysis(client, &b64_image, config).await?;
 
     let receipt: Receipt = serde_json::from_str(&vlm_json_output).context(format!(
         "Failed to parse VLM JSON output: {}",

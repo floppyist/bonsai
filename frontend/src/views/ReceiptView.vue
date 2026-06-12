@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useBonsaiStore } from '../stores/BonsaiStore.js'
 import ReceiptHeader from '../components/ReceiptHeader.vue'
 import ReceiptArticleRow from '../components/ReceiptArticleRow.vue'
@@ -16,14 +16,6 @@ const emit = defineEmits(['startEanScanner', 'saveAndCloseReceipt'])
 
 const store = useBonsaiStore()
 const activeEditIndex = ref(null)
-
-if (props.receiptData) {
-  store.setReceiptData(props.receiptData)
-}
-
-watch(() => props.receiptData, (newData) => {
-  if (newData) store.setReceiptData(newData)
-}, { deep: true })
 
 const manuallyEnterEan = (index) => {
   const input = prompt('Bitte EAN-Barcode manuell eingeben:', store.currentReceipt.articles[index]?.ean || '')
@@ -68,7 +60,7 @@ const handleSave = async () => {
           @updateQuantity="(idx, delta) => store.updateQuantity(idx, delta)"
           @updatePrice="(idx, delta) => store.updatePrice(idx, delta)"
           @remove="(idx) => { store.removeArticle(idx); activeEditIndex = activeEditIndex === idx ? null : (activeEditIndex > idx ? activeEditIndex - 1 : activeEditIndex); }"
-          @rename="(idx, name) => item.name = name"
+          @rename="(name) => item.name = name"
           @manuallyEnterEan="manuallyEnterEan"
           @startEanScanner="(idx) => emit('startEanScanner', idx)"
         />

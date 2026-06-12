@@ -19,7 +19,7 @@ const nameValidationMsg = ref('✨ Format optimiert')
 const brandValidationMsg = ref('✨ Format optimiert')
 
 const ALLOWED_NAME_REGEX = /[^A-Z0-9 \-&.,%]/g;
-const ALLOWED_BRAND_REGEX = /[^A-Z0-9 \-&%]/g;
+const ALLOWED_BRAND_REGEX = /[^A-Z0-9 \-&.,%]/g;
 
 const handleLiveSanitize = (field, originalValue) => {
   let transformed = originalValue

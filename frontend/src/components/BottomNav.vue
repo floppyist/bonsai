@@ -18,11 +18,11 @@ const navigateTo = (routeName) => router.push({ name: routeName })
       <button @click="navigateTo('pantry')"
         :class="[
           'bg-none border-0 flex flex-col items-center justify-center gap-1 w-full h-full transition-all duration-200',
-          currentPath.startsWith('/pantry') || currentPath === '/' ? 'text-[#2D6A4F] font-bold scale-105' : 'text-[#6B7C74]'
+          currentPath === '/' ? 'text-[#2D6A4F] font-bold scale-105' : 'text-[#6B7C74]'
         ]"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          :stroke-width="currentPath.startsWith('/pantry') || currentPath === '/' ? '2.5' : '2'"
+          :stroke-width="currentPath === '/' ? '2.5' : '2'"
           stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"
         >
           <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>

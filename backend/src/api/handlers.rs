@@ -18,7 +18,7 @@ pub async fn upload_receipt(
     State(state): State<Arc<AppState>>,
     body_bytes: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let receipt_struct = match ocr::run_ocr_pipeline(&body_bytes, &state.config).await {
+    let receipt_struct = match ocr::run_ocr_pipeline(&state.http_client, &body_bytes, &state.config).await {
         Ok(r) => r,
         Err(err) => {
             error!("OCR Pipeline failed: {:?}", err);

@@ -3,8 +3,6 @@ import { ref, provide } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBonsaiStore } from './stores/BonsaiStore.js'
 
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library'
-
 import PantryHeader from './components/PantryHeader.vue'
 import VisionOverlay from './components/VisionOverlay.vue'
 import EanScannerModal from './components/modals/EanScannerModal.vue'
@@ -14,7 +12,6 @@ const router = useRouter();
 const store = useBonsaiStore();
 
 const scanStep = ref(0)
-const receiptData = ref(null)
 const showOverlay = ref(false)
 const isProcessingInBackground = ref(false)
 const fileInput = ref(null)
@@ -27,16 +24,8 @@ let codeReaderInstance = null
 let codeReaderControls = null
 
 const isDevMode = ref(false)
-provide('isDevMode', isDevMode)
 
-const pantryItems = ref([
-  { id: 1, name: 'Frische Bio-Avocado', category: 'Gemüse & Früchte', emoji: '🥑', stock: 90, stockColor: '#52B788', daysLeft: '3 Tage', status: 'urgent' },
-  { id: 2, name: 'Hafermilch (Barista)', category: 'Getränke', emoji: '🥛', stock: 40, stockColor: '#D8F3DC', daysLeft: '12 Tage', status: 'good' },
-  { id: 3, name: 'Cherrytomaten', category: 'Gemüse & Früchte', emoji: '🍅', stock: 15, stockColor: '#FF4D4D', daysLeft: '2 Tage', status: 'urgent' },
-  { id: 4, name: 'Vollkornnudeln', category: 'Pasta & Getreide', emoji: '🍝', stock: 100, stockColor: '#52B788', daysLeft: '180 Tage', status: 'infinite' },
-  { id: 5, name: 'Griechischer Joghurt', category: 'Milchprodukte', emoji: '🥣', stock: 75, stockColor: '#74C69D', daysLeft: '6 Tage', status: 'warn' },
-  { id: 6, name: 'Eier (Freiland)', category: 'Frischeprodukte', emoji: '🥚', stock: 60, stockColor: '#74C69D', daysLeft: '8 Tage', status: 'good' },
-])
+provide('isDevMode', isDevMode)
 
 const MOCK_RECEIPT_DATA = {
   id: 'mock-dev-123',
@@ -72,7 +61,6 @@ const handleFileUpload = (event) => {
   showOverlay.value = true;
   isProcessingInBackground.value = true;
   scanStep.value = 1;
-  receiptData.value = null;
   scanStep.value = 2;
 
   if (isDevMode.value) {
@@ -140,6 +128,7 @@ const startEanScanner = (index) => {
 
 const initializeQrScanner = async (videoElement) => {
   try {
+    const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } = await import('@zxing/library');
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8]);
 
@@ -157,7 +146,7 @@ const initializeQrScanner = async (videoElement) => {
     codeReaderControls = await codeReaderInstance.decodeFromConstraints(
       constraints,
       videoElement,
-      (result, err) => {
+      (result) => {
         if (result) {
           const scannedEan = result.getText();
           if (!scannedEan) return;
@@ -208,7 +197,6 @@ const stopEanScanner = () => {
 };
 
 const saveAndCloseReceipt = () => {
-  receiptData.value = null;
   router.push({ name: 'pantry' });
 };
 </script>
@@ -226,8 +214,6 @@ const saveAndCloseReceipt = () => {
         <router-view v-slot="{ Component }">
           <component
             :is="Component"
-            ref="receiptViewRef"
-            :pantryItems="pantryItems"
             :formatPrice="formatPrice"
             @startEanScanner="startEanScanner"
             @saveAndCloseReceipt="saveAndCloseReceipt"

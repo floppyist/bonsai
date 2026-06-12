@@ -245,16 +245,6 @@ export const useBonsaiStore = defineStore('bonsai', {
       }
     },
 
-    async fetchPantrySummary() {
-      try {
-        const response = await fetch('/api/pantry/summary')
-        if (!response.ok) return
-        this.pantrySummary = await response.json()
-      } catch (error) {
-        console.error('Failed fetching pantry summary:', error)
-      }
-    },
-
     updateRetailer(name) {
       this.currentReceipt.retailer = name
       this.revalidateCurrentArticles()
@@ -278,7 +268,7 @@ export const useBonsaiStore = defineStore('bonsai', {
 
           this.currentReceipt.articles = updatedArticles;
 
-          console.log('✨ Artikel erfolgreich revalidiert für:', this.currentReceipt.retailer);
+          console.log('Artikel erfolgreich revalidiert für:', this.currentReceipt.retailer);
         } else {
           console.error("Revalidation fehlgeschlagen:", response.statusText);
         }

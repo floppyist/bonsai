@@ -29,6 +29,7 @@ pub struct AppState {
     pub config: config::BonsaiOptions,
     pub user_db: SqlitePool,
     pub ean_db: SqlitePool,
+    pub http_client: reqwest::Client,
 }
 
 #[tokio::main]
@@ -55,6 +56,7 @@ async fn main() {
         config: options,
         user_db: pools.user_db,
         ean_db: pools.ean_db,
+        http_client: reqwest::Client::new(),
     });
 
     let ip = shared_state.config.general.ip;
