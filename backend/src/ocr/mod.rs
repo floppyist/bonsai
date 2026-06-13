@@ -165,7 +165,11 @@ where
     }
 }
 
-pub async fn run_ocr_pipeline(client: &reqwest::Client, image_bytes: &[u8], config: &BonsaiOptions) -> Result<Receipt> {
+pub async fn run_ocr_pipeline(
+    client: &reqwest::Client,
+    image_bytes: &[u8],
+    config: &BonsaiOptions,
+) -> Result<Receipt> {
     info!("Starting OCR pipeline...");
 
     let vec_bytes = opencv::core::Vector::<u8>::from_iter(image_bytes.to_vec());

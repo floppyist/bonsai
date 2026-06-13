@@ -9,7 +9,11 @@ use crate::ocr::OllamaOptions;
 use crate::ocr::OllamaRequest;
 use crate::ocr::OllamaResponse;
 
-pub async fn run_vlm_analysis(client: &reqwest::Client, b64_image: &str, config: &BonsaiOptions) -> Result<String> {
+pub async fn run_vlm_analysis(
+    client: &reqwest::Client,
+    b64_image: &str,
+    config: &BonsaiOptions,
+) -> Result<String> {
     let model = &config.lvm.ollama_model;
     let url = &config.lvm.ollama_url;
 

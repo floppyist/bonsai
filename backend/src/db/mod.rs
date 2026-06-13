@@ -48,6 +48,26 @@ pub struct PantryItem {
     pub unit_price: f64,
 }
 
+#[derive(Debug, Clone)]
+pub struct ReceiptSummaryRow {
+    pub id: i64,
+    pub retailer: String,
+    pub receipt_date: Option<String>,
+    pub created_at: String,
+    pub item_count: i64,
+    pub total_price_cents: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReceiptDetailItem {
+    pub name: String,
+    pub brand: String,
+    pub category: String,
+    pub ean: Option<String>,
+    pub quantity: f64,
+    pub unit_price_cents: i64,
+}
+
 fn map_row_to_product(row: sqlx::sqlite::SqliteRow) -> MatchedProductData {
     MatchedProductData {
         name: row.get("name"),
@@ -60,7 +80,7 @@ fn map_row_to_product(row: sqlx::sqlite::SqliteRow) -> MatchedProductData {
 pub async fn establish_database_connections(
     options: &BonsaiOptions,
 ) -> Result<DatabasePools, DBError> {
-    /* User DB */
+    // User DB
     let user_db_url = &options.database.user_db_url;
 
     if !Sqlite::database_exists(user_db_url).await.unwrap_or(false) {
@@ -91,7 +111,7 @@ pub async fn establish_database_connections(
 
     info!("Connected to database: '{}'", user_db_url);
 
-    /* EAN DB */
+    // EAN DB
     let ean_db_url = &options.database.ean_db_url;
 
     if !Sqlite::database_exists(ean_db_url).await.unwrap_or(false) {
@@ -166,7 +186,7 @@ pub async fn resolve_article_metadata(
     retailer: &str,
     clean_name: &str,
 ) -> Result<Option<MatchedProductData>, DBError> {
-    /* OCR variants check */
+    // OCR variants check
     if let Some(row) = sqlx::query(
         "SELECT ep.name, ep.category, ep.brand, ep.ean FROM ean_ocr_variants v \
             JOIN ean_products ep ON v.ean = ep.ean \
@@ -182,7 +202,7 @@ pub async fn resolve_article_metadata(
         return Ok(Some(map_row_to_product(row)));
     }
 
-    /* User history */
+    // User history
     if let Some(row) = sqlx::query(
         "SELECT p.name, p.category, p.brand, p.ean FROM products p \
             JOIN receipt_items ri ON ri.product_id = p.id \
@@ -199,7 +219,7 @@ pub async fn resolve_article_metadata(
         return Ok(Some(map_row_to_product(row)));
     }
 
-    /* Global EAN products */
+    // Global EAN products
     if let Some(row) = sqlx::query(
         "SELECT name, category, brand, ean FROM ean_products \
             WHERE TRIM(name) = ? COLLATE NOCASE LIMIT 1",
@@ -215,10 +235,8 @@ pub async fn resolve_article_metadata(
     Ok(None)
 }
 
-/*
-* Atomically saves a finalized receipt within a database transaction,
-* populating both the user history and the global EAN/OCR dictionary.
-*/
+// Atomically saves a finalized receipt within a database transaction,
+// populating both the user history and the global EAN/OCR dictionary.
 pub async fn save_finalized_receipt(
     user_db: &SqlitePool,
     ean_db: &SqlitePool,
@@ -226,7 +244,7 @@ pub async fn save_finalized_receipt(
 ) -> Result<(), DBError> {
     let mut tx = user_db.begin().await.map_err(|_| DBError::Transaction)?;
 
-    /* Insert the main receipt record */
+    // Insert the main receipt record
     let receipt_row =
         sqlx::query("INSERT INTO receipts (retailer, receipt_date) VALUES (?, ?) RETURNING id")
             .bind(&payload.retailer)
@@ -237,7 +255,7 @@ pub async fn save_finalized_receipt(
 
     let receipt_id: i64 = receipt_row.get("id");
 
-    /* Process each individual article */
+    // Process each individual article
     for article in payload.articles {
         let mut product_id: Option<i64> = None;
         let mut existing_ean: Option<String> = None;
@@ -246,7 +264,7 @@ pub async fn save_finalized_receipt(
 
         let clean_article_ean = article.ean.as_ref().map(|e| util::sanitize_ean(e));
 
-        /* Attempt matching via EAN code */
+        // Attempt matching via EAN code
         if let Some(ref ean_code) = clean_article_ean {
             let row = sqlx::query(
                 "SELECT id, ean, category, brand FROM products WHERE ean = ? AND is_deleted = 0 LIMIT 1"
@@ -266,7 +284,7 @@ pub async fn save_finalized_receipt(
             }
         }
 
-        /* Fallback: Attempt matching via product name */
+        // Fallback: Attempt matching via product name
         if product_id.is_none() {
             let row = sqlx::query(
                 "SELECT id, ean, category, brand FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
@@ -286,7 +304,7 @@ pub async fn save_finalized_receipt(
             }
         }
 
-        /* Create or update the product details */
+        // Create or update the product details
         let final_product_id = match product_id {
             Some(id) => {
                 let need_ean_update = existing_ean.is_none() && clean_article_ean.is_some();
@@ -327,7 +345,7 @@ pub async fn save_finalized_receipt(
             }
         };
 
-        /* Link the item to the receipt */
+        // Link the item to the receipt
         let price_in_cents = (article.price * 100.0).round() as i64;
         sqlx::query("INSERT INTO receipt_items (receipt_id, product_id, price, quantity) VALUES (?, ?, ?, ?)")
             .bind(receipt_id)
@@ -338,7 +356,7 @@ pub async fn save_finalized_receipt(
             .await
             .map_err(|_| DBError::Query)?;
 
-        /* Enrich the global EAN data dictionary asynchronously (ignoring failures gracefully) */
+        // Enrich the global EAN data dictionary asynchronously (ignoring failures gracefully)
         if let Some(ref ean_code) = clean_article_ean
             && !ean_code.trim().is_empty()
         {
@@ -370,7 +388,7 @@ pub async fn save_finalized_receipt(
     tx.commit().await.map_err(|_| DBError::Transaction)
 }
 
-/* Fetches the aggregated category breakdown metrics from the user database */
+// Fetches the aggregated category breakdown metrics from the user database
 pub async fn fetch_pantry_summary(user_db: &SqlitePool) -> Result<Vec<PantrySummaryItem>, DBError> {
     sqlx::query(
         "SELECT p.category, SUM(ri.quantity) as total_quantity, CAST(SUM(ri.price * ri.quantity) AS INTEGER) as total_price_cents \
@@ -388,7 +406,63 @@ pub async fn fetch_pantry_summary(user_db: &SqlitePool) -> Result<Vec<PantrySumm
         .collect()
 }
 
-/* Fetches all individual tracking entities currently stocked inside the user pantry */
+// Fetches the receipt history list with aggregated item counts and totals
+pub async fn fetch_receipts_history(
+    user_db: &SqlitePool,
+) -> Result<Vec<ReceiptSummaryRow>, DBError> {
+    sqlx::query(
+        "SELECT r.id, r.retailer, r.receipt_date, r.created_at, \
+            COUNT(ri.id) as item_count, \
+            CAST(COALESCE(SUM(ri.price * ri.quantity), 0) AS INTEGER) as total_price_cents \
+            FROM receipts r LEFT JOIN receipt_items ri ON ri.receipt_id = r.id \
+            GROUP BY r.id ORDER BY COALESCE(r.receipt_date, r.created_at) DESC, r.id DESC",
+    )
+    .fetch_all(user_db)
+    .await
+    .map_err(|_| DBError::Query)?
+    .into_iter()
+    .map(|row| {
+        Ok(ReceiptSummaryRow {
+            id: row.get("id"),
+            retailer: row.get("retailer"),
+            receipt_date: row.try_get("receipt_date").ok(),
+            created_at: row.get("created_at"),
+            item_count: row.get("item_count"),
+            total_price_cents: row.get("total_price_cents"),
+        })
+    })
+    .collect()
+}
+
+// Fetches all individual articles captured during the scan of a specific receipt
+pub async fn fetch_receipt_details(
+    user_db: &SqlitePool,
+    receipt_id: i64,
+) -> Result<Vec<ReceiptDetailItem>, DBError> {
+    sqlx::query(
+        "SELECT p.name, p.brand, p.category, p.ean, ri.quantity, ri.price as unit_price_cents \
+            FROM receipt_items ri JOIN products p ON ri.product_id = p.id \
+            WHERE ri.receipt_id = ? ORDER BY ri.id ASC",
+    )
+    .bind(receipt_id)
+    .fetch_all(user_db)
+    .await
+    .map_err(|_| DBError::Query)?
+    .into_iter()
+    .map(|row| {
+        Ok(ReceiptDetailItem {
+            name: row.get("name"),
+            brand: row.get("brand"),
+            category: row.get("category"),
+            ean: row.try_get("ean").ok(),
+            quantity: row.get("quantity"),
+            unit_price_cents: row.get("unit_price_cents"),
+        })
+    })
+    .collect()
+}
+
+// Fetches all individual tracking entities currently stocked inside the user pantry
 pub async fn fetch_pantry_items(user_db: &SqlitePool) -> Result<Vec<PantryItem>, DBError> {
     sqlx::query(
         "SELECT p.name, p.brand, p.category, SUM(ri.quantity) as quantity, CAST(ri.price AS REAL) / 100.0 as unit_price \

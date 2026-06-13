@@ -83,6 +83,11 @@ async fn main() {
             get(api::handlers::get_pantry_summary),
         )
         .route("/api/pantry/items", get(api::handlers::get_pantry_items))
+        .route("/api/receipts", get(api::handlers::get_receipts_history))
+        .route(
+            "/api/receipts/{id}",
+            get(api::handlers::get_receipt_details),
+        )
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);

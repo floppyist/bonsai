@@ -60,7 +60,7 @@ const handleFileUpload = (event) => {
 
   showOverlay.value = true;
   isProcessingInBackground.value = true;
-  scanStep.value = 2;
+  scanStep.value = 1;
 
   if (isDevMode.value) {
     setTimeout(() => {
@@ -96,7 +96,17 @@ const handleFileUpload = (event) => {
   });
 
   worker.onmessage = (e) => {
-    const { payload, error } = e.data;
+    const { status, payload, error } = e.data;
+
+    if (status === 'uploading') {
+      scanStep.value = 1;
+      return;
+    }
+
+    if (status === 'processing') {
+      scanStep.value = 2;
+      return;
+    }
 
     if (error) {
       console.error('Error while uploading receipt: ', error);

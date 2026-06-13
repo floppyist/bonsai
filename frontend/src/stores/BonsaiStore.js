@@ -4,6 +4,9 @@ export const useBonsaiStore = defineStore('bonsai', {
   state: () => ({
     isDevMode: false,
     receiptsHistory: [],
+    isLoadingReceipts: false,
+    receiptDetails: {},
+    loadingReceiptDetailId: null,
     pantryItems: [],
 
     currentReceipt: {
@@ -122,6 +125,41 @@ export const useBonsaiStore = defineStore('bonsai', {
       }
     },
 
+    async fetchReceiptsHistory() {
+      this.isLoadingReceipts = true
+      try {
+        const response = await fetch('/api/receipts')
+
+        if (!response.ok) return
+
+        this.receiptsHistory = await response.json()
+      } catch (error) {
+        console.error('Failed fetching receipts history:', error)
+      } finally {
+        this.isLoadingReceipts = false
+      }
+    },
+
+    async fetchReceiptDetails(receiptId) {
+      if (this.receiptDetails[receiptId]) return this.receiptDetails[receiptId]
+
+      this.loadingReceiptDetailId = receiptId
+      try {
+        const response = await fetch(`/api/receipts/${receiptId}`)
+
+        if (!response.ok) return []
+
+        const items = await response.json()
+        this.receiptDetails[receiptId] = items
+        return items
+      } catch (error) {
+        console.error('Failed fetching receipt details:', error)
+        return []
+      } finally {
+        this.loadingReceiptDetailId = null
+      }
+    },
+
     setReceiptData(rawData) {
       if (!rawData) return
 
@@ -223,13 +261,8 @@ export const useBonsaiStore = defineStore('bonsai', {
         })
         if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`)
 
-        this.receiptsHistory.unshift({
-          id: Date.now(),
-          retailer: payload.retailer,
-          date: payload.receipt_date,
-          itemCount: payload.articles.length,
-          totalAmount: payload.total_amount
-        })
+        // Refetch from server so receipt IDs match the database (required for detail lookups)
+        await this.fetchReceiptsHistory()
 
         this.currentReceipt = { retailer: '', date: '', articles: [], scannedTotalAmount: null }
         return true
@@ -263,7 +296,7 @@ export const useBonsaiStore = defineStore('bonsai', {
 
           this.currentReceipt.articles = updatedArticles;
 
-          console.log('Artikel erfolgreich revalidiert für:', this.currentReceipt.retailer);
+          console.debug('Artikel erfolgreich revalidiert für:', this.currentReceipt.retailer);
         } else {
           console.error("Revalidation fehlgeschlagen:", response.statusText);
         }
