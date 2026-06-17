@@ -1,8 +1,9 @@
+mod api;
 mod config;
+mod db;
 mod logger;
 mod ocr;
-mod db;
-mod api;
+mod util;
 
 use axum::routing::get;
 use std::net::SocketAddr;
@@ -10,8 +11,8 @@ use std::process::exit;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::post;
 use axum::extract::DefaultBodyLimit;
+use axum::routing::post;
 use axum_server::tls_rustls::RustlsConfig;
 
 use log::error;
@@ -28,6 +29,7 @@ pub struct AppState {
     pub config: config::BonsaiOptions,
     pub user_db: SqlitePool,
     pub ean_db: SqlitePool,
+    pub http_client: reqwest::Client,
 }
 
 #[tokio::main]
@@ -45,6 +47,7 @@ async fn main() {
         Ok(p) => p,
         Err(_) => {
             error!("Database could not be initialized. Exiting.");
+
             exit(1);
         }
     };
@@ -53,7 +56,11 @@ async fn main() {
         config: options,
         user_db: pools.user_db,
         ean_db: pools.ean_db,
+        http_client: reqwest::Client::new(),
     });
+
+    let ip = shared_state.config.general.ip;
+    let port = shared_state.config.general.port;
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -62,11 +69,25 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/upload-receipt", post(api::handlers::upload_receipt))
-        .route("/api/receipt/revalidate", post(api::handlers::revalidate_articles))
+        .route(
+            "/api/receipt/revalidate",
+            post(api::handlers::revalidate_articles),
+        )
         .route("/api/ean/{ean}", get(api::handlers::lookup_ean))
-        .route("/api/finalize-receipt", post(api::handlers::finalize_receipt))
-        .route("/api/pantry/summary", get(api::handlers::get_pantry_summary))
+        .route(
+            "/api/finalize-receipt",
+            post(api::handlers::finalize_receipt),
+        )
+        .route(
+            "/api/pantry/summary",
+            get(api::handlers::get_pantry_summary),
+        )
         .route("/api/pantry/items", get(api::handlers::get_pantry_items))
+        .route("/api/receipts", get(api::handlers::get_receipts_history))
+        .route(
+            "/api/receipts/{id}",
+            get(api::handlers::get_receipt_details),
+        )
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);
@@ -75,11 +96,12 @@ async fn main() {
         Ok(config) => config,
         Err(e) => {
             error!("Failed to load TLS certificates: {}", e);
+
             exit(1);
         }
     };
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr = SocketAddr::from((ip, port));
 
     info!("bonsai backend runs on 'https://{}'", addr);
 
@@ -87,9 +109,10 @@ async fn main() {
         .serve(app.into_make_service())
         .await
     {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             error!("Error serving backend: '{}':", e);
+
             exit(1);
         }
     }

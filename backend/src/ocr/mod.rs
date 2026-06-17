@@ -20,92 +20,6 @@ pub struct Field<T> {
     pub value: T,
 }
 
-fn deserialize_flexible_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum StringOrFloat {
-        Float(f64),
-        String(String),
-    }
-
-    match StringOrFloat::deserialize(deserializer)? {
-        StringOrFloat::Float(f) => Ok(f),
-        StringOrFloat::String(s) => s
-            .replace(',', ".")
-            .trim()
-            .parse::<f64>()
-            .map_err(serde::de::Error::custom),
-    }
-}
-
-fn deserialize_field_string<'de, D>(deserializer: D) -> Result<Field<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum FlatOrWrapped {
-        Wrapped { value: String },
-        Flat(String),
-        Object(serde_json::Value),
-    }
-
-    match FlatOrWrapped::deserialize(deserializer)? {
-        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
-        FlatOrWrapped::Flat(s) => Ok(Field { value: s }),
-        FlatOrWrapped::Object(obj) => {
-            if let Some(v) = obj.get("value").and_then(|v| v.as_str()) {
-                Ok(Field { value: v.to_string() })
-            } else {
-                Ok(Field { value: obj.to_string() })
-            }
-        }
-    }
-}
-
-fn deserialize_field_opt_string<'de, D>(deserializer: D) -> Result<Field<Option<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum FlatOrWrapped {
-        Wrapped { value: Option<String> },
-        Flat(String),
-        Null,
-    }
-
-    match FlatOrWrapped::deserialize(deserializer)? {
-        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
-        FlatOrWrapped::Flat(s) => Ok(Field { value: Some(s) }),
-        FlatOrWrapped::Null => Ok(Field { value: None }),
-    }
-}
-
-fn deserialize_field_f64<'de, D>(deserializer: D) -> Result<Field<f64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum FlatOrWrapped {
-        Wrapped {
-            #[serde(deserialize_with = "deserialize_flexible_f64")]
-            value: f64,
-        },
-        #[serde(deserialize_with = "deserialize_flexible_f64")]
-        Flat(f64),
-    }
-
-    match FlatOrWrapped::deserialize(deserializer)? {
-        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
-        FlatOrWrapped::Flat(f) => Ok(Field { value: f }),
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Article {
     pub name: String,
@@ -161,7 +75,101 @@ struct ResponseMessage {
     content: String,
 }
 
-pub async fn run_ocr_pipeline(image_bytes: &[u8], config: &BonsaiOptions) -> Result<Receipt> {
+fn deserialize_flexible_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrFloat {
+        Float(f64),
+        String(String),
+    }
+
+    match StringOrFloat::deserialize(deserializer)? {
+        StringOrFloat::Float(f) => Ok(f),
+        StringOrFloat::String(s) => s
+            .replace(',', ".")
+            .trim()
+            .parse::<f64>()
+            .map_err(serde::de::Error::custom),
+    }
+}
+
+fn deserialize_field_string<'de, D>(deserializer: D) -> Result<Field<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FlatOrWrapped {
+        Wrapped { value: String },
+        Flat(String),
+        Object(serde_json::Value),
+    }
+
+    match FlatOrWrapped::deserialize(deserializer)? {
+        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
+        FlatOrWrapped::Flat(s) => Ok(Field { value: s }),
+        FlatOrWrapped::Object(obj) => {
+            if let Some(v) = obj.get("value").and_then(|v| v.as_str()) {
+                Ok(Field {
+                    value: v.to_string(),
+                })
+            } else {
+                Ok(Field {
+                    value: obj.to_string(),
+                })
+            }
+        }
+    }
+}
+
+fn deserialize_field_opt_string<'de, D>(deserializer: D) -> Result<Field<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FlatOrWrapped {
+        Wrapped { value: Option<String> },
+        Flat(String),
+        Null,
+    }
+
+    match FlatOrWrapped::deserialize(deserializer)? {
+        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
+        FlatOrWrapped::Flat(s) => Ok(Field { value: Some(s) }),
+        FlatOrWrapped::Null => Ok(Field { value: None }),
+    }
+}
+
+fn deserialize_field_f64<'de, D>(deserializer: D) -> Result<Field<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FlatOrWrapped {
+        Wrapped {
+            #[serde(deserialize_with = "deserialize_flexible_f64")]
+            value: f64,
+        },
+        #[serde(deserialize_with = "deserialize_flexible_f64")]
+        Flat(f64),
+    }
+
+    match FlatOrWrapped::deserialize(deserializer)? {
+        FlatOrWrapped::Wrapped { value } => Ok(Field { value }),
+        FlatOrWrapped::Flat(f) => Ok(Field { value: f }),
+    }
+}
+
+pub async fn run_ocr_pipeline(
+    client: &reqwest::Client,
+    image_bytes: &[u8],
+    config: &BonsaiOptions,
+) -> Result<Receipt> {
     info!("Starting OCR pipeline...");
 
     let vec_bytes = opencv::core::Vector::<u8>::from_iter(image_bytes.to_vec());
@@ -169,10 +177,12 @@ pub async fn run_ocr_pipeline(image_bytes: &[u8], config: &BonsaiOptions) -> Res
         .context("Failed to decode image bytes into OpenCV Mat")?;
 
     let b64_image = preprocessing::process_image_pipeline_from_mat(&img_bgr, config)?;
-    let vlm_json_output = vlm::run_vlm_analysis(&b64_image, config).await?;
+    let vlm_json_output = vlm::run_vlm_analysis(client, &b64_image, config).await?;
 
-    let receipt: Receipt = serde_json::from_str(&vlm_json_output)
-        .context(format!("Failed to parse VLM JSON output: {}", vlm_json_output))?;
+    let receipt: Receipt = serde_json::from_str(&vlm_json_output).context(format!(
+        "Failed to parse VLM JSON output: {}",
+        vlm_json_output
+    ))?;
 
     debug!("Output: {:?}", receipt);
     info!("OCR finished");

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "TEXT", rename_all = "SCREAMING_SNAKE_CASE")]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProductCategory {
@@ -28,7 +28,7 @@ pub enum ProductCategory {
     DiyGarden,
     BooksMedia,
 
-    // Fallback
+    #[default]
     Uncategorized,
 }
 
@@ -57,11 +57,5 @@ impl fmt::Display for ProductCategory {
             ProductCategory::Uncategorized => "Unkategorisiert",
         };
         write!(f, "{}", s)
-    }
-}
-
-impl Default for ProductCategory {
-    fn default() -> Self {
-        ProductCategory::Uncategorized
     }
 }

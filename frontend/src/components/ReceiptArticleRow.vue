@@ -7,7 +7,6 @@ const props = defineProps({
   isActive: Boolean,
   isDuplicate: Boolean,
   categoriesList: Array,
-  commonProductSuggestions: Array,
   formatPrice: Function
 })
 
@@ -20,7 +19,7 @@ const nameValidationMsg = ref('✨ Format optimiert')
 const brandValidationMsg = ref('✨ Format optimiert')
 
 const ALLOWED_NAME_REGEX = /[^A-Z0-9 \-&.,%]/g;
-const ALLOWED_BRAND_REGEX = /[^A-Z0-9 \-&%]/g;
+const ALLOWED_BRAND_REGEX = /[^A-Z0-9 \-&.,%]/g;
 
 const handleLiveSanitize = (field, originalValue) => {
   let transformed = originalValue
@@ -100,17 +99,6 @@ const handleBlurCleanup = (field, currentValue) => {
 
           <div v-if="item.ean" :class="['text-[10px] font-mono font-bold px-1', isDuplicate ? 'text-amber-700' : 'text-[#2D6A4F]']">
             EAN: {{ item.ean }} <span v-if="isDuplicate">(Duplikat!)</span>
-          </div>
-          <div class="flex flex-wrap gap-1">
-            <button
-              v-for="sug in commonProductSuggestions"
-              :key="sug"
-              type="button"
-              @click="emit('rename', index, sug.toUpperCase())"
-              class="text-[9px] bg-white border border-zinc-200 px-2 py-1 rounded text-[#6B7C74] font-medium min-h-[28px]"
-            >
-              {{ sug }}
-            </button>
           </div>
         </div>
       </div>

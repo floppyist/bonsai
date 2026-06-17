@@ -1,6 +1,7 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useBonsaiStore } from '../stores/BonsaiStore.js'
+
 import ReceiptHeader from '../components/ReceiptHeader.vue'
 import ReceiptArticleRow from '../components/ReceiptArticleRow.vue'
 import ReceiptSummary from '../components/ReceiptSummary.vue'
@@ -15,46 +16,29 @@ const props = defineProps({
 const emit = defineEmits(['startEanScanner', 'saveAndCloseReceipt'])
 
 const store = useBonsaiStore()
+
+const showEanInput = ref(false);
+const eanInputIndex = ref(null);
+const eanInputValue = ref('');
+const eanInputRef = ref(null);
+
 const activeEditIndex = ref(null)
 
-const categoriesList = [
-  { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
-  { value: 'DAIRY_EGGS', label: '🥛 Milchprodukte & Eier' },
-  { value: 'FRUIT_VEGETABLES', label: '🥦 Obst & Gemüse' },
-  { value: 'MEAT_FISH', label: '🥩 Fleisch, Fisch & Ersatz' },
-  { value: 'STAPLE_FOODS', label: '🍝 Grundnahrungsmittel' },
-  { value: 'CANNED_JARRED', label: '🥫 Konserven & Gläser' },
-  { value: 'OILS_SAUCES_SPICES', label: '🫚 Öle, Saucen & Gewürze' },
-  { value: 'BREAKFAST_SPREADS', label: '🍯 Frühstück & Aufstriche' },
-  { value: 'SNACKS_SWEETS', label: '🍫 Süßwaren & Knabberzeug' },
-  { value: 'BEVERAGES', label: '☕ Getränke' },
-  { value: 'DRUGSTORE_BEAUTY', label: '🧴 Drogerie & Kosmetik' },
-  { value: 'HOUSEHOLD_CLEANING', label: '🧹 Haushalt & Reinigung' },
-  { value: 'PET_SUPPLIES', label: '🐾 Haustierbedarf' },
-  { value: 'ELECTRONICS', label: '🔌 Elektronik & Zubehör' },
-  { value: 'STATIONERY_OFFICE', label: '✏️ Schreibwaren & Büro' },
-  { value: 'HOME_LIVING', label: '🍳 Wohnen & Küche' },
-  { value: 'CLOTHING_TEXTILES', label: '🧦 Kleidung & Textilien' },
-  { value: 'DIY_GARDEN', label: '🛠️ Baumarkt & Garten' },
-  { value: 'BOOKS_MEDIA', label: '📚 Medien & Freizeit' },
-  { value: 'UNCATEGORIZED', label: '❓ Unkategorisiert' }
-]
-
-const commonProductSuggestions = ['Obst & Gemüse', 'Molkereiprodukte', 'Brot & Backwaren', 'Getränke', 'Fleisch & Fisch', 'Snacks']
-
-if (props.receiptData) {
-  store.setReceiptData(props.receiptData)
+const manuallyEnterEan = (index) => {
+  eanInputIndex.value = index
+  eanInputValue.value = store.currentReceipt.articles[index]?.ean || ''
+  showEanInput.value = true
+  nextTick(() => eanInputRef.value?.focus())
 }
 
-watch(() => props.receiptData, (newData) => {
-  if (newData) store.setReceiptData(newData)
-}, { deep: true })
-
-const manuallyEnterEan = (index) => {
-  const input = prompt('Bitte EAN-Barcode manuell eingeben:', store.currentReceipt.articles[index]?.ean || '')
-  if (input !== null && input.trim()) {
-    store.lookupEanForArticle(index, input.trim())
+const confirmEanInput = () => {
+  if (eanInputValue.value.trim()) {
+    store.lookupEanForArticle(eanInputIndex.value, eanInputValue.value.trim())
   }
+
+  showEanInput.value = false
+  eanInputIndex.value = null
+  eanInputValue.value = ''
 }
 
 const handleSave = async () => {
@@ -87,14 +71,13 @@ const handleSave = async () => {
           :index="index"
           :isActive="activeEditIndex === index"
           :isDuplicate="item.ean ? store.currentReceipt.articles.filter(a => a.ean === item.ean).length > 1 : false"
-          :categoriesList="categoriesList"
-          :commonProductSuggestions="commonProductSuggestions"
+          :categoriesList="store.categoriesList"
           :formatPrice="formatPrice"
           @toggleEdit="activeEditIndex = activeEditIndex === index ? null : index"
           @updateQuantity="(idx, delta) => store.updateQuantity(idx, delta)"
           @updatePrice="(idx, delta) => store.updatePrice(idx, delta)"
           @remove="(idx) => { store.removeArticle(idx); activeEditIndex = activeEditIndex === idx ? null : (activeEditIndex > idx ? activeEditIndex - 1 : activeEditIndex); }"
-          @rename="(idx, name) => item.name = name"
+          @rename="(name) => item.name = name"
           @manuallyEnterEan="manuallyEnterEan"
           @startEanScanner="(idx) => emit('startEanScanner', idx)"
         />
@@ -124,6 +107,24 @@ const handleSave = async () => {
       :formatPrice="formatPrice"
       @save="handleSave"
     />
+
+    <div v-if="showEanInput"
+      class="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+      @click.self="showEanInput = false">
+      <div class="bg-white rounded-2xl p-5 shadow-xl mx-4 w-full max-w-sm">
+        <h3 class="text-sm font-bold text-[#2D3A34] mb-3">EAN-Code eingeben</h3>
+        <input ref="eanInputRef" v-model="eanInputValue"
+          type="text" inputmode="numeric"
+          placeholder="z.B. 4012345678900"
+          class="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm mb-3 outline-none focus:border-[#2D6A4F]"
+          @keydown.enter="confirmEanInput"
+          @keydown.escape="showEanInput = false" />
+        <div class="flex gap-2">
+          <button @click="showEanInput = false" class="flex-1 py-2.5 text-sm font-medium text-zinc-500 bg-zinc-100 rounded-xl cursor-pointer">Abbrechen</button>
+          <button @click="confirmEanInput" class="flex-1 py-2.5 text-sm font-medium text-white bg-[#2D6A4F] rounded-xl cursor-pointer">Bestätigen</button>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>

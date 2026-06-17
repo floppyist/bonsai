@@ -3,11 +3,10 @@ import { defineStore } from 'pinia'
 export const useBonsaiStore = defineStore('bonsai', {
   state: () => ({
     isDevMode: false,
-
-    receiptsHistory: [
-      { id: 1, retailer: 'Rewe Markt', date: '2026-06-08', itemCount: 5, totalAmount: 24.50 }
-    ],
-
+    receiptsHistory: [],
+    isLoadingReceipts: false,
+    receiptDetails: {},
+    loadingReceiptDetailId: null,
     pantryItems: [],
 
     currentReceipt: {
@@ -19,6 +18,30 @@ export const useBonsaiStore = defineStore('bonsai', {
 
     isLoadingPantry: false,
     isSubmittingReceipt: false,
+
+    categoriesList: [
+      { value: 'BAKERY', label: '🍞 Brot & Backwaren' },
+      { value: 'DAIRY_EGGS', label: '🥛 Milchprodukte & Eier' },
+      { value: 'FRUIT_VEGETABLES', label: '🥦 Obst & Gemüse' },
+      { value: 'MEAT_FISH', label: '🥩 Fleisch, Fisch & Ersatz' },
+      { value: 'STAPLE_FOODS', label: '🍝 Grundnahrungsmittel' },
+      { value: 'CANNED_JARRED', label: '🥫 Konserven & Gläser' },
+      { value: 'OILS_SAUCES_SPICES', label: '🫚 Öle, Saucen & Gewürze' },
+      { value: 'BREAKFAST_SPREADS', label: '🍯 Frühstück & Aufstriche' },
+      { value: 'SNACKS_SWEETS', label: '🍫 Süßwaren & Knabberzeug' },
+      { value: 'BEVERAGES', label: '☕ Getränke' },
+      { value: 'DRUGSTORE_BEAUTY', label: '🧴 Drogerie & Kosmetik' },
+      { value: 'HOUSEHOLD_CLEANING', label: '🧹 Haushalt & Reinigung' },
+      { value: 'PET_SUPPLIES', label: '🐾 Haustierbedarf' },
+      { value: 'ELECTRONICS', label: '🔌 Elektronik & Zubehör' },
+      { value: 'STATIONERY_OFFICE', label: '✏️ Schreibwaren & Büro' },
+      { value: 'HOME_LIVING', label: '🍳 Wohnen & Küche' },
+      { value: 'CLOTHING_TEXTILES', label: '🧦 Kleidung & Textilien' },
+      { value: 'DIY_GARDEN', label: '🛠️ Baumarkt & Garten' },
+      { value: 'BOOKS_MEDIA', label: '📚 Medien & Freizeit' },
+      { value: 'TOBACCO_ACCESSORIES', label: '🚬 Tabak & Zubehör' },
+      { value: 'UNCATEGORIZED', label: '❓ Unkategorisiert' },
+    ],
   }),
 
   getters: {
@@ -29,6 +52,7 @@ export const useBonsaiStore = defineStore('bonsai', {
         if (!summaryMap[item.category]) {
           summaryMap[item.category] = { total_quantity: 0, total_price: 0 }
         }
+
         summaryMap[item.category].total_quantity += item.quantity
         summaryMap[item.category].total_price += item.price
       })
@@ -45,29 +69,41 @@ export const useBonsaiStore = defineStore('bonsai', {
         (sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0
       )
     },
+
     isStoreInvalid: (state) => {
       const store = state.currentReceipt.retailer
+
       return !store || store.trim() === '' || store === 'Unbekannter Händler'
     },
+
     isDateInvalid: (state) => {
       const date = state.currentReceipt.date
+
       return !date || date.trim() === ''
     },
+
     isPriceInvalid: (state) => {
       return state.currentReceipt.articles.reduce((sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0) <= 0
     },
+
     isMissingEan: (state) => {
       return state.currentReceipt.articles.some(item => !item.ean)
     },
+
     hasDuplicateEan: (state) => {
       const eans = state.currentReceipt.articles.map(item => item.ean).filter(Boolean)
+
       return new Set(eans).size !== eans.length
     },
+
     hasAmountMismatch: (state) => {
       if (state.currentReceipt.scannedTotalAmount === null) return false
+
       const currentTotal = state.currentReceipt.articles.reduce((sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0)
+
       return state.currentReceipt.scannedTotalAmount.toFixed(2) !== currentTotal.toFixed(2)
     },
+
     isFormInvalid() {
       return this.isStoreInvalid || this.isDateInvalid || this.isPriceInvalid || this.isMissingEan || this.hasDuplicateEan
     }
@@ -78,12 +114,49 @@ export const useBonsaiStore = defineStore('bonsai', {
       this.isLoadingPantry = true
       try {
         const response = await fetch('/api/pantry/items')
+
         if (!response.ok) return
+
         this.pantryItems = await response.json()
       } catch (error) {
         console.error('Failed fetching pantry items:', error)
       } finally {
         this.isLoadingPantry = false
+      }
+    },
+
+    async fetchReceiptsHistory() {
+      this.isLoadingReceipts = true
+      try {
+        const response = await fetch('/api/receipts')
+
+        if (!response.ok) return
+
+        this.receiptsHistory = await response.json()
+      } catch (error) {
+        console.error('Failed fetching receipts history:', error)
+      } finally {
+        this.isLoadingReceipts = false
+      }
+    },
+
+    async fetchReceiptDetails(receiptId) {
+      if (this.receiptDetails[receiptId]) return this.receiptDetails[receiptId]
+
+      this.loadingReceiptDetailId = receiptId
+      try {
+        const response = await fetch(`/api/receipts/${receiptId}`)
+
+        if (!response.ok) return []
+
+        const items = await response.json()
+        this.receiptDetails[receiptId] = items
+        return items
+      } catch (error) {
+        console.error('Failed fetching receipt details:', error)
+        return []
+      } finally {
+        this.loadingReceiptDetailId = null
       }
     },
 
@@ -188,31 +261,15 @@ export const useBonsaiStore = defineStore('bonsai', {
         })
         if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`)
 
-        this.receiptsHistory.unshift({
-          id: Date.now(),
-          retailer: payload.retailer,
-          date: payload.receipt_date,
-          itemCount: payload.articles.length,
-          totalAmount: payload.total_amount
-        })
+        // Refetch from server so receipt IDs match the database (required for detail lookups)
+        await this.fetchReceiptsHistory()
 
         this.currentReceipt = { retailer: '', date: '', articles: [], scannedTotalAmount: null }
         return true
-      } catch (error) {
-        alert('Speichern fehlgeschlagen: ' + error.message)
+      } catch {
         return false
       } finally {
         this.isSubmittingReceipt = false
-      }
-    },
-
-    async fetchPantrySummary() {
-      try {
-        const response = await fetch('/api/pantry/summary')
-        if (!response.ok) return
-        this.pantrySummary = await response.json()
-      } catch (error) {
-        console.error('Failed fetching pantry summary:', error)
       }
     },
 
@@ -239,7 +296,7 @@ export const useBonsaiStore = defineStore('bonsai', {
 
           this.currentReceipt.articles = updatedArticles;
 
-          console.log('✨ Artikel erfolgreich revalidiert für:', this.currentReceipt.retailer);
+          console.debug('Artikel erfolgreich revalidiert für:', this.currentReceipt.retailer);
         } else {
           console.error("Revalidation fehlgeschlagen:", response.statusText);
         }

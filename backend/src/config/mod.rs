@@ -1,7 +1,8 @@
 use std::fs;
+use std::net::IpAddr;
 
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct BonsaiOptions {
@@ -15,6 +16,8 @@ pub struct BonsaiOptions {
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct GeneralOptions {
+    pub ip: IpAddr,
+    pub port: u16,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -57,10 +60,14 @@ impl Default for BonsaiOptions {
     fn default() -> Self {
         Self {
             general: GeneralOptions {
+                ip: "0.0.0.0".parse().expect("Invalid default IP: 0.0.0.0"),
+                port: 3000,
             },
+
             preprocessing: PreprocessingOptions {
                 debug_dir: "target/debug_output".to_string(),
             },
+
             lvm: LVMOptions {
                 ollama_model: "qwen2.5vl:3b".to_string(),
                 ollama_url: "http://localhost:11434/api/chat".to_string(),
@@ -68,19 +75,22 @@ impl Default for BonsaiOptions {
                 top_p: 0.1,
                 num_thread: 8,
             },
+
             logging: LoggingOptions {
                 console: true,
                 file: false,
                 path: "".to_string(),
                 level: "info".to_string(),
             },
+
             database: DatabaseOptions {
                 user_db_url: "sqlite://db/user.db".to_string(),
                 user_db_max_pool_connections: 5,
                 ean_db_url: "sqlite://db/ean.db".to_string(),
                 ean_db_max_pool_connections: 5,
             },
-            tls: TlsOptions { 
+
+            tls: TlsOptions {
                 cert_path: "certs/server.crt".to_string(),
                 key_path: "certs/server.key".to_string(),
             },
@@ -105,4 +115,3 @@ impl BonsaiOptions {
         }
     }
 }
-
