@@ -4,6 +4,7 @@ mod db;
 mod logger;
 mod ocr;
 mod util;
+mod auth;
 
 use axum::routing::get;
 use std::net::SocketAddr;
@@ -88,6 +89,8 @@ async fn main() {
             "/api/receipts/{id}",
             get(api::handlers::get_receipt_details),
         )
+        .route("/api/auth/register", post(api::auth_handlers::register))
+        .route("/api/auth/login", post(api::auth_handlers::login))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);
@@ -107,7 +110,7 @@ async fn main() {
 
     match axum_server::bind_rustls(addr, tls_config)
         .serve(app.into_make_service())
-        .await
+    .await
     {
         Ok(_) => {}
         Err(e) => {
