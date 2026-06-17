@@ -20,5 +20,5 @@ log = "0.4.32"
 fern = { version = "0.7.1", features = [ "colored" ] }
 sqlx = { version = "0.8.6", features = [ "runtime-tokio", "sqlite" ] }
 argon2 = { version = "0.5.3", features = [ "std" ] }
-jsonwebtoken = "10.4.0"
+jsonwebtoken = { version = "10.4.0", features = [ "rust_crypto" ] }
 rand_core = { version = "0.10.1" }

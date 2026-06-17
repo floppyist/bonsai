@@ -89,8 +89,11 @@ async fn main() {
             "/api/receipts/{id}",
             get(api::handlers::get_receipt_details),
         )
+        .route("/api/health", get(|| async { "OK" }))
         .route("/api/auth/register", post(api::auth_handlers::register))
         .route("/api/auth/login", post(api::auth_handlers::login))
+        .route("/api/auth/me", get(api::auth_handlers::me))
+        .route("/api/auth/logout", post(api::auth_handlers::logout))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);

@@ -2,6 +2,11 @@ import { defineStore } from 'pinia'
 
 export const useBonsaiStore = defineStore('bonsai', {
   state: () => ({
+    // Auth
+    user: null,
+    isBackendConnected: true,
+
+    // App
     isDevMode: false,
     receiptsHistory: [],
     isLoadingReceipts: false,
@@ -45,6 +50,10 @@ export const useBonsaiStore = defineStore('bonsai', {
   }),
 
   getters: {
+    isAuthenticated: (state) => !!state.user,
+
+
+
     pantrySummary: (state) => {
       const summaryMap = {}
 
@@ -110,6 +119,81 @@ export const useBonsaiStore = defineStore('bonsai', {
   },
 
   actions: {
+    // Auth
+    async checkBackendHealth() {
+      try {
+        const response = await fetch('/api/health')
+        this.isBackendConnected = response.ok
+      } catch (error) {
+        console.error('Backend unreachable:', error)
+        this.isBackendConnected = false
+      }
+    },
+
+    async checkAuthStatus() {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          this.user = await response.json()
+        } else {
+          this.user = null
+        }
+      } catch (error) {
+        console.error('Failed to check auth status:', error)
+        this.user = null
+      }
+    },
+
+    async register(username, password) {
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        })
+        return response.ok
+      } catch (error) {
+        console.error('Registration failed:', error)
+        return false
+      }
+    },
+
+    async login(username, password) {
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        })
+
+        if (response.ok) {
+          await this.checkAuthStatus()
+          this.fetchPantryItems()
+          this.fetchReceiptsHistory()
+          return true
+        }
+        return false
+      } catch (error) {
+        console.error('Login failed:', error)
+        return false
+      }
+    },
+
+    async logout() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' })
+      } catch (error) {
+        console.error('Logout request failed:', error)
+      } finally {
+        this.user = null
+        this.pantryItems = []
+        this.receiptsHistory = []
+        this.receiptDetails = {}
+        this.currentReceipt = { retailer: '', date: '', articles: [], scannedTotalAmount: null }
+      }
+    },
+
+    // App
     async fetchPantryItems() {
       this.isLoadingPantry = true
       try {

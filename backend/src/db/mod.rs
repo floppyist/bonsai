@@ -401,7 +401,7 @@ pub async fn save_finalized_receipt(
 pub async fn fetch_pantry_summary(user_db: &SqlitePool, user_id: i32) -> Result<Vec<PantrySummaryItem>, DBError> {
     sqlx::query(
         "SELECT p.category, SUM(ri.quantity) as total_quantity, CAST(SUM(ri.price * ri.quantity) AS INTEGER) as total_price_cents \
-            FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 AND user.id = ? GROUP BY p.category"
+            FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 AND p.user_id = ? GROUP BY p.category"
     )
         .bind(user_id)
         .fetch_all(user_db)
@@ -455,14 +455,19 @@ pub async fn fetch_receipt_details(
 ) -> Result<Vec<ReceiptDetailItem>, DBError> {
     sqlx::query(
         "SELECT p.name, p.brand, p.category, p.ean, ri.quantity, ri.price as unit_price_cents \
-            FROM receipt_items ri JOIN products p ON ri.product_id = p.id \
+            FROM receipt_items ri \
+            JOIN products p ON ri.product_id = p.id \
+            JOIN receipts r ON ri.receipt_id = r.id \
             WHERE ri.receipt_id = ? AND r.user_id = ? ORDER BY ri.id ASC",
     )
     .bind(receipt_id)
     .bind(user_id)
     .fetch_all(user_db)
     .await
-    .map_err(|_| DBError::Query)?
+    .map_err(|e| {
+        error!("Error fetching receipt details: {}", e);
+        DBError::Query
+    })?
     .into_iter()
     .map(|row| {
         Ok(ReceiptDetailItem {
@@ -517,4 +522,14 @@ pub async fn get_user_by_username(pool: &SqlitePool, username: &str) -> Result<O
         .map_err(|_| DBError::Query)?;
     
     Ok(row.map(|r| (r.get("id"), r.get("password_hash"))))
+}
+
+pub async fn get_username_by_id(pool: &SqlitePool, user_id: i32) -> Result<Option<String>, DBError> {
+    let row = sqlx::query("SELECT username FROM users WHERE id = ?")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|_| DBError::Query)?;
+
+    Ok(row.map(|r| r.get("username")))
 }
