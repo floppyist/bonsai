@@ -10,6 +10,28 @@ const password = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 const isSubmitting = ref(false)
+const fileInput = ref(null)
+
+const triggerFileSelect = () => {
+  if (store.user && fileInput.value) {
+    fileInput.value.click()
+  }
+}
+
+const handleFileChange = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    errorMessage.value = 'Bitte wähle ein gültiges Bild aus.'
+    return
+  }
+
+  const success = await store.uploadAvatar(file)
+  if (!success) {
+    errorMessage.value = 'Fehler beim Hochladen des Profilbilds.'
+  }
+}
 
 const handleSubmit = async () => {
   if (!username.value.trim() || !password.value.trim()) {
@@ -40,7 +62,7 @@ const handleSubmit = async () => {
         errorMessage.value = 'Registrierung fehlgeschlagen. Name evtl. vergeben.'
       }
     }
-  } catch (err) {
+  } catch {
     errorMessage.value = 'Ein Fehler ist aufgetreten.'
   } finally {
     isSubmitting.value = false
@@ -51,12 +73,42 @@ const handleSubmit = async () => {
 <template>
   <div class="bg-white rounded-[20px] p-5 shadow-sm border border-black/5 space-y-4">
     <div class="flex items-center gap-4">
-      <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[#B7E4C7] to-[#74C69D] flex items-center justify-center text-xl shadow-inner">
-        👤
+      <div
+        @click="triggerFileSelect"
+        :class="[
+          'w-12 h-12 rounded-full relative flex items-center justify-center text-xl shadow-inner border border-black/5 overflow-hidden select-none',
+          store.user?.profile_picture_url ? 'bg-zinc-100' : 'bg-gradient-to-br from-[#B7E4C7] to-[#74C69D]',
+          store.user ? 'cursor-pointer group' : ''
+        ]"
+      >
+        <img
+          v-if="store.user?.profile_picture_url"
+          :src="store.user.profile_picture_url"
+          alt="Avatar"
+          class="w-full h-full object-cover"
+        />
+        <span v-else>👤</span>
+
+        <div
+          v-if="store.user"
+          class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+        >
+          <span class="text-xs text-white">📷</span>
+        </div>
       </div>
+
+      <input
+        v-if="store.user"
+        type="file"
+        ref="fileInput"
+        class="hidden"
+        accept="image/*"
+        @change="handleFileChange"
+      />
+
       <div class="flex-1">
         <h3 class="text-sm font-bold text-[#2D3A34]">
-          {{ store.user ? `Haushalt: ${store.user.username}` : 'Nicht angemeldet' }}
+          {{ store.user ? store.user.username : 'Nicht angemeldet' }}
         </h3>
         <p class="text-[11px] text-[#6B7C74]">
           {{ store.user ? 'Daten sind an dein Konto gebunden' : 'Melde dich an, um deine Vorräte zu verwalten' }}

@@ -7,6 +7,7 @@ mod util;
 mod auth;
 
 use axum::routing::get;
+use tower_http::services::ServeDir;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
@@ -94,6 +95,8 @@ async fn main() {
         .route("/api/auth/login", post(api::auth_handlers::login))
         .route("/api/auth/me", get(api::auth_handlers::me))
         .route("/api/auth/logout", post(api::auth_handlers::logout))
+        .route("/api/auth/upload-avatar", post(api::auth_handlers::upload_avatar))
+        .nest_service("/avatars", ServeDir::new("./storage/avatars"))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);

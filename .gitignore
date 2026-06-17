@@ -25,3 +25,4 @@ backend/config.toml
 # Custom stuff
 certs/
 db/
+storage/

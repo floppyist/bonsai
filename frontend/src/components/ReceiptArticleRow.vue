@@ -12,7 +12,8 @@ const props = defineProps({
 
 const emit = defineEmits([
   'toggleEdit', 'updateQuantity', 'updatePrice', 'remove',
-  'rename', 'manuallyEnterEan', 'startEanScanner'
+  'rename', 'manuallyEnterEan', 'startEanScanner',
+  'updateItemField'
 ])
 
 const nameValidationMsg = ref('✨ Format optimiert')
@@ -23,11 +24,11 @@ const ALLOWED_BRAND_REGEX = /[^A-Z0-9 \-&.,%]/g;
 
 const handleLiveSanitize = (field, originalValue) => {
   let transformed = originalValue
-  .toUpperCase()
-  .replace(/Ä/g, 'AE')
-  .replace(/Ö/g, 'OE')
-  .replace(/Ü/g, 'UE')
-  .replace(/ß/g, 'SS');
+    .toUpperCase()
+    .replace(/Ä/g, 'AE')
+    .replace(/Ö/g, 'OE')
+    .replace(/Ü/g, 'UE')
+    .replace(/ß/g, 'SS');
 
   const regex = field === 'name' ? ALLOWED_NAME_REGEX : ALLOWED_BRAND_REGEX;
 
@@ -40,11 +41,12 @@ const handleLiveSanitize = (field, originalValue) => {
     if (field === 'brand') brandValidationMsg.value = '✨ Perfekt formatiert';
   }
 
-  props.item[field] = transformed
+  emit('updateItemField', props.index, field, transformed)
 }
 
 const handleBlurCleanup = (field, currentValue) => {
-  props.item[field] = currentValue.replace(/\s+/g, ' ').trim();
+  const cleaned = currentValue.replace(/\s+/g, ' ').trim();
+  emit('updateItemField', props.index, field, cleaned)
 }
 </script>
 
@@ -65,7 +67,7 @@ const handleBlurCleanup = (field, currentValue) => {
             <div>
               <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Artikelbezeichnung</label>
               <input
-                v-model="item.name"
+                :value="item.name"
                 @input="handleLiveSanitize('name', $event.target.value)"
                 @blur="handleBlurCleanup('name', item.name)"
                 class="w-full bg-white border border-zinc-300 rounded-lg p-2 text-xs font-bold focus:outline-none text-[#2D3A34] min-h-[38px]"
@@ -75,7 +77,7 @@ const handleBlurCleanup = (field, currentValue) => {
             <div>
               <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Marke / Hersteller</label>
               <input
-                v-model="item.brand"
+                :value="item.brand"
                 @input="handleLiveSanitize('brand', $event.target.value)"
                 @blur="handleBlurCleanup('brand', item.brand)"
                 placeholder="Z.B. EIGENMARKE, UNKNOWN..."
@@ -88,7 +90,8 @@ const handleBlurCleanup = (field, currentValue) => {
           <div>
             <label class="text-[9px] font-bold text-[#6B7C74] uppercase tracking-wider block mb-0.5">Kategorie</label>
             <select
-              v-model="item.category"
+              :value="item.category"
+              @change="emit('updateItemField', index, 'category', $event.target.value)"
               class="w-full bg-white border border-zinc-300 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none focus:border-[#2D6A4F] text-[#2D3A34] min-h-[38px] cursor-pointer"
             >
               <option v-for="cat in categoriesList" :key="cat.value" :value="cat.value">
@@ -132,7 +135,8 @@ const handleBlurCleanup = (field, currentValue) => {
               <input
                 type="number"
                 step="0.01"
-                v-model.number="item.price"
+                :value="item.price"
+                @input="emit('updateItemField', index, 'price', Number($event.target.value))"
                 class="text-right text-xs font-mono font-bold text-[#2D3A34] bg-transparent w-full focus:outline-none"
               />
               <span class="text-xs font-bold text-[#6B7C74] ml-1">€</span>

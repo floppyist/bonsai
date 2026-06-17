@@ -1,10 +1,13 @@
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import eslintPlugin from 'vite-plugin-eslint'
 import { VitePWA } from 'vite-plugin-pwa'
 import tailwindcss from '@tailwindcss/vite'
 import fs from 'node:fs'
 import path from 'node:path'
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 const certPath = path.resolve(__dirname, '../backend/certs/server.crt')
 const keyPath = path.resolve(__dirname, '../backend/certs/server.key')
@@ -12,6 +15,7 @@ const keyPath = path.resolve(__dirname, '../backend/certs/server.key')
 export default defineConfig({
   plugins: [
     vue(),
+    eslintPlugin({ cache: false }),
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
@@ -52,6 +56,11 @@ export default defineConfig({
         target: 'https://bonsai.pi:3000',
         changeOrigin: true,
         secure: false
+      },
+      '/avatars': {
+        target: 'https://bonsai.pi:3000',
+        changeOrigin: true,
+        secure: false,
       }
     }
   },

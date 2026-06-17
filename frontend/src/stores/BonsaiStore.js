@@ -52,8 +52,6 @@ export const useBonsaiStore = defineStore('bonsai', {
   getters: {
     isAuthenticated: (state) => !!state.user,
 
-
-
     pantrySummary: (state) => {
       const summaryMap = {}
 
@@ -133,6 +131,7 @@ export const useBonsaiStore = defineStore('bonsai', {
     async checkAuthStatus() {
       try {
         const response = await fetch('/api/auth/me')
+
         if (response.ok) {
           this.user = await response.json()
         } else {
@@ -195,7 +194,10 @@ export const useBonsaiStore = defineStore('bonsai', {
 
     // App
     async fetchPantryItems() {
+      if (!this.isAuthenticated) return
+
       this.isLoadingPantry = true
+
       try {
         const response = await fetch('/api/pantry/items')
 
@@ -210,7 +212,10 @@ export const useBonsaiStore = defineStore('bonsai', {
     },
 
     async fetchReceiptsHistory() {
+      if (!this.isAuthenticated) return
+
       this.isLoadingReceipts = true
+
       try {
         const response = await fetch('/api/receipts')
 
@@ -278,17 +283,21 @@ export const useBonsaiStore = defineStore('bonsai', {
         this.currentReceipt.articles[index][field] = value
       }
     },
+
     updateQuantity(index, delta) {
       const item = this.currentReceipt.articles[index]
       if (item) item.quantity = Math.max(1, (item.quantity || 1) + delta)
     },
+
     updatePrice(index, delta) {
       const item = this.currentReceipt.articles[index]
       if (item) item.price = Math.max(0, Number((Number(item.price || 0) + delta).toFixed(2)))
     },
+
     removeArticle(index) {
       this.currentReceipt.articles.splice(index, 1)
     },
+
     addNewArticle() {
       this.currentReceipt.articles.push({
         name: '',
@@ -386,6 +395,30 @@ export const useBonsaiStore = defineStore('bonsai', {
         }
       } catch (err) {
         console.error("Fehler beim Live-Abgleich der Artikel:", err);
+      }
+    },
+
+    async uploadAvatar(file) {
+      try {
+        const formData = new FormData()
+        formData.append('avatar', file)
+
+        const response = await fetch('/api/auth/upload-avatar', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (this.user) {
+            this.user.profile_picture_url = data.avatar_url
+          }
+          return true
+        }
+        return false
+      } catch (error) {
+        console.error('Avatar upload failed:', error)
+        return false
       }
     },
   }

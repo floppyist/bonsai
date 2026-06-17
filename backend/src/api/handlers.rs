@@ -76,7 +76,7 @@ pub async fn upload_receipt(
                         &state.user_db,
                         &extracted_retailer,
                         &clean_name,
-                        user.user_id, // <-- Hier übergeben
+                        user.user_id,
                     ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
                     if let Some(data) = matched_data {
@@ -278,7 +278,7 @@ pub async fn revalidate_articles(
                 &state.user_db,
                 retailer,
                 &clean_name,
-                user.user_id, // <-- Hier übergeben
+                user.user_id,
             )
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

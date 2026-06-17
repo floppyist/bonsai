@@ -15,6 +15,7 @@ const receiptCount = computed(() => store.receiptsHistory.length)
 
 const retailerBars = computed(() => {
   const groups = {}
+
   store.receiptsHistory.forEach(r => {
     const name = r.retailer || 'Unbekannt'
     groups[name] = (groups[name] || 0) + (r.totalAmount || 0)

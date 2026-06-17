@@ -6,7 +6,7 @@ import ReceiptHeader from '../components/ReceiptHeader.vue'
 import ReceiptArticleRow from '../components/ReceiptArticleRow.vue'
 import ReceiptSummary from '../components/ReceiptSummary.vue'
 
-const props = defineProps({
+defineProps({
   formatPrice: {
     type: Function,
     default: (p) => `${Number(p).toFixed(2)} €`
@@ -41,8 +41,13 @@ const confirmEanInput = () => {
   eanInputValue.value = ''
 }
 
+const handleArticleFieldUpdate = (index, field, value) => {
+  store.updateArticleField(index, field, value)
+}
+
 const handleSave = async () => {
   const success = await store.finalizeReceipt()
+
   if (success) {
     emit('saveAndCloseReceipt')
   }
@@ -73,12 +78,11 @@ const handleSave = async () => {
           :isDuplicate="item.ean ? store.currentReceipt.articles.filter(a => a.ean === item.ean).length > 1 : false"
           :categoriesList="store.categoriesList"
           :formatPrice="formatPrice"
-          @toggleEdit="activeEditIndex = activeEditIndex === index ? null : index"
+          @update-item-field="handleArticleFieldUpdate" @toggleEdit="activeEditIndex = activeEditIndex === index ? null : index"
           @updateQuantity="(idx, delta) => store.updateQuantity(idx, delta)"
           @updatePrice="(idx, delta) => store.updatePrice(idx, delta)"
           @remove="(idx) => { store.removeArticle(idx); activeEditIndex = activeEditIndex === idx ? null : (activeEditIndex > idx ? activeEditIndex - 1 : activeEditIndex); }"
-          @rename="(name) => item.name = name"
-          @manuallyEnterEan="manuallyEnterEan"
+          @rename="(name) => handleArticleFieldUpdate(index, 'name', name)" @manuallyEnterEan="manuallyEnterEan"
           @startEanScanner="(idx) => emit('startEanScanner', idx)"
         />
       </div>
