@@ -39,3 +39,9 @@ pub struct RevalidateArticleItem {
     pub category: ProductCategory,
     pub brand: String,
 }
+
+#[derive(serde::Deserialize)]
+pub struct AuthPayload {
+    pub username: String,
+    pub password: String,
+}

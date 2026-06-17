@@ -185,6 +185,7 @@ pub async fn resolve_article_metadata(
     user_db: &SqlitePool,
     retailer: &str,
     clean_name: &str,
+    user_id: i32,
 ) -> Result<Option<MatchedProductData>, DBError> {
     // OCR variants check
     if let Some(row) = sqlx::query(
@@ -208,10 +209,11 @@ pub async fn resolve_article_metadata(
             JOIN receipt_items ri ON ri.product_id = p.id \
             JOIN receipts r ON ri.receipt_id = r.id \
             WHERE TRIM(p.name) = ? COLLATE NOCASE AND TRIM(r.retailer) = ? COLLATE NOCASE \
-            AND p.is_deleted = 0 LIMIT 1",
+            AND p.is_deleted = 0 AND r.user_id = ? LIMIT 1",
     )
     .bind(clean_name)
     .bind(retailer)
+    .bind(user_id)
     .fetch_optional(user_db)
     .await
     .map_err(|_| DBError::Query)?
@@ -241,12 +243,14 @@ pub async fn save_finalized_receipt(
     user_db: &SqlitePool,
     ean_db: &SqlitePool,
     payload: FinalizeReceiptPayload,
+    user_id: i32,
 ) -> Result<(), DBError> {
     let mut tx = user_db.begin().await.map_err(|_| DBError::Transaction)?;
 
     // Insert the main receipt record
     let receipt_row =
-        sqlx::query("INSERT INTO receipts (retailer, receipt_date) VALUES (?, ?) RETURNING id")
+        sqlx::query("INSERT INTO receipts (user_id, retailer, receipt_date) VALUES (?, ?, ?) RETURNING id")
+            .bind(user_id)
             .bind(&payload.retailer)
             .bind(&payload.receipt_date)
             .fetch_one(&mut *tx)
@@ -267,9 +271,10 @@ pub async fn save_finalized_receipt(
         // Attempt matching via EAN code
         if let Some(ref ean_code) = clean_article_ean {
             let row = sqlx::query(
-                "SELECT id, ean, category, brand FROM products WHERE ean = ? AND is_deleted = 0 LIMIT 1"
+                "SELECT id, ean, category, brand FROM products WHERE ean = ? AND is_deleted = 0 AND user_id = ? LIMIT 1"
             )
                 .bind(ean_code)
+                .bind(user_id)
                 .fetch_optional(&mut *tx)
                 .await
                 .map_err(|_| DBError::Query)?;
@@ -287,9 +292,10 @@ pub async fn save_finalized_receipt(
         // Fallback: Attempt matching via product name
         if product_id.is_none() {
             let row = sqlx::query(
-                "SELECT id, ean, category, brand FROM products WHERE name = ? AND is_deleted = 0 LIMIT 1"
+                "SELECT id, ean, category, brand FROM products WHERE name = ? AND is_deleted = 0 AND user_id = ? LIMIT 1"
             )
                 .bind(&article.name)
+                .bind(user_id)
                 .fetch_optional(&mut *tx)
                 .await
                 .map_err(|_| DBError::Query)?;
@@ -330,10 +336,12 @@ pub async fn save_finalized_receipt(
                         .await
                         .map_err(|_| DBError::Query)?;
                 }
+
                 id
             }
             None => {
-                sqlx::query("INSERT INTO products (name, ean, category, brand) VALUES (?, ?, ?, ?) RETURNING id")
+                sqlx::query("INSERT INTO products (user_id, name, ean, category, brand) VALUES (?, ?, ?, ?, ?) RETURNING id")
+                    .bind(user_id)
                     .bind(&article.name)
                     .bind(&clean_article_ean)
                     .bind(article.category)
@@ -347,6 +355,7 @@ pub async fn save_finalized_receipt(
 
         // Link the item to the receipt
         let price_in_cents = (article.price * 100.0).round() as i64;
+
         sqlx::query("INSERT INTO receipt_items (receipt_id, product_id, price, quantity) VALUES (?, ?, ?, ?)")
             .bind(receipt_id)
             .bind(final_product_id)
@@ -389,11 +398,12 @@ pub async fn save_finalized_receipt(
 }
 
 // Fetches the aggregated category breakdown metrics from the user database
-pub async fn fetch_pantry_summary(user_db: &SqlitePool) -> Result<Vec<PantrySummaryItem>, DBError> {
+pub async fn fetch_pantry_summary(user_db: &SqlitePool, user_id: i32) -> Result<Vec<PantrySummaryItem>, DBError> {
     sqlx::query(
         "SELECT p.category, SUM(ri.quantity) as total_quantity, CAST(SUM(ri.price * ri.quantity) AS INTEGER) as total_price_cents \
-            FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 GROUP BY p.category"
+            FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 AND p.user_id = ? GROUP BY p.category"
     )
+        .bind(user_id)
         .fetch_all(user_db)
         .await
         .map_err(|_| DBError::Query)?
@@ -409,14 +419,17 @@ pub async fn fetch_pantry_summary(user_db: &SqlitePool) -> Result<Vec<PantrySumm
 // Fetches the receipt history list with aggregated item counts and totals
 pub async fn fetch_receipts_history(
     user_db: &SqlitePool,
+    user_id: i32,
 ) -> Result<Vec<ReceiptSummaryRow>, DBError> {
     sqlx::query(
         "SELECT r.id, r.retailer, r.receipt_date, r.created_at, \
             COUNT(ri.id) as item_count, \
             CAST(COALESCE(SUM(ri.price * ri.quantity), 0) AS INTEGER) as total_price_cents \
             FROM receipts r LEFT JOIN receipt_items ri ON ri.receipt_id = r.id \
+            WHERE r.user_id = ? \
             GROUP BY r.id ORDER BY COALESCE(r.receipt_date, r.created_at) DESC, r.id DESC",
     )
+    .bind(user_id)
     .fetch_all(user_db)
     .await
     .map_err(|_| DBError::Query)?
@@ -438,16 +451,23 @@ pub async fn fetch_receipts_history(
 pub async fn fetch_receipt_details(
     user_db: &SqlitePool,
     receipt_id: i64,
+    user_id: i32,
 ) -> Result<Vec<ReceiptDetailItem>, DBError> {
     sqlx::query(
         "SELECT p.name, p.brand, p.category, p.ean, ri.quantity, ri.price as unit_price_cents \
-            FROM receipt_items ri JOIN products p ON ri.product_id = p.id \
-            WHERE ri.receipt_id = ? ORDER BY ri.id ASC",
+            FROM receipt_items ri \
+            JOIN products p ON ri.product_id = p.id \
+            JOIN receipts r ON ri.receipt_id = r.id \
+            WHERE ri.receipt_id = ? AND r.user_id = ? ORDER BY ri.id ASC",
     )
     .bind(receipt_id)
+    .bind(user_id)
     .fetch_all(user_db)
     .await
-    .map_err(|_| DBError::Query)?
+    .map_err(|e| {
+        error!("Error fetching receipt details: {}", e);
+        DBError::Query
+    })?
     .into_iter()
     .map(|row| {
         Ok(ReceiptDetailItem {
@@ -463,11 +483,12 @@ pub async fn fetch_receipt_details(
 }
 
 // Fetches all individual tracking entities currently stocked inside the user pantry
-pub async fn fetch_pantry_items(user_db: &SqlitePool) -> Result<Vec<PantryItem>, DBError> {
+pub async fn fetch_pantry_items(user_db: &SqlitePool, user_id: i32) -> Result<Vec<PantryItem>, DBError> {
     sqlx::query(
         "SELECT p.name, p.brand, p.category, SUM(ri.quantity) as quantity, CAST(ri.price AS REAL) / 100.0 as unit_price \
-            FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 GROUP BY p.name, p.brand, p.category, ri.price"
+            FROM receipt_items ri JOIN products p ON ri.product_id = p.id WHERE p.is_deleted = 0 AND p.user_id = ? GROUP BY p.name, p.brand, p.category, ri.price"
     )
+        .bind(user_id)
         .fetch_all(user_db)
         .await
         .map_err(|_| DBError::Query)?
@@ -480,4 +501,25 @@ pub async fn fetch_pantry_items(user_db: &SqlitePool) -> Result<Vec<PantryItem>,
             unit_price: row.get("unit_price"),
         }))
         .collect()
+}
+
+pub async fn create_user(pool: &SqlitePool, username: &str, password_hash: &str) -> Result<i64, DBError> {
+    let row = sqlx::query("INSERT INTO users (username, password_hash) VALUES (?, ?) RETURNING id")
+        .bind(username)
+        .bind(password_hash)
+        .fetch_one(pool)
+        .await
+        .map_err(|_| DBError::Query)?;
+    
+    Ok(row.get("id"))
+}
+
+pub async fn get_user_by_username(pool: &SqlitePool, username: &str) -> Result<Option<(i32, String)>, DBError> {
+    let row = sqlx::query("SELECT id, password_hash FROM users WHERE username = ?")
+        .bind(username)
+        .fetch_optional(pool)
+        .await
+        .map_err(|_| DBError::Query)?;
+    
+    Ok(row.map(|r| (r.get("id"), r.get("password_hash"))))
 }

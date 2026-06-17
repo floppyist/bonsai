@@ -11,24 +11,26 @@ use log::error;
 
 use super::models::FinalizeReceiptPayload;
 use crate::api::models::RevalidateReceiptPayload;
+use crate::auth::extractor::AuthenticatedUser;
 use crate::ocr;
 use crate::{AppState, util};
 
 pub async fn upload_receipt(
     State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
     body_bytes: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let receipt_struct =
-        match ocr::run_ocr_pipeline(&state.http_client, &body_bytes, &state.config).await {
-            Ok(r) => r,
-            Err(err) => {
-                error!("OCR Pipeline failed: {:?}", err);
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("OCR Pipeline error: {}", err),
-                ));
-            }
-        };
+    match ocr::run_ocr_pipeline(&state.http_client, &body_bytes, &state.config).await {
+        Ok(r) => r,
+        Err(err) => {
+            error!("OCR Pipeline failed: {:?}", err);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("OCR Pipeline error: {}", err),
+            ));
+        }
+    };
 
     let mut receipt_val: serde_json::Value = serde_json::to_value(receipt_struct).map_err(|e| {
         (
@@ -61,6 +63,7 @@ pub async fn upload_receipt(
             for article in articles_array {
                 if let Some(raw_name) = article.get("name").and_then(|n| n.as_str()) {
                     let clean_name = util::clean_ocr_name(raw_name);
+
                     if clean_name.is_empty() {
                         continue;
                     }
@@ -73,9 +76,8 @@ pub async fn upload_receipt(
                         &state.user_db,
                         &extracted_retailer,
                         &clean_name,
-                    )
-                    .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                        user.user_id,
+                    ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
                     if let Some(data) = matched_data {
                         article["name"] = serde_json::json!(data.name);
@@ -86,7 +88,7 @@ pub async fn upload_receipt(
                         }
 
                         if let Some(ref ean_code) = data.ean
-                            && article.get("ean").and_then(|e| e.as_str()).is_none()
+                        && article.get("ean").and_then(|e| e.as_str()).is_none()
                         {
                             article["ean"] = serde_json::json!(util::sanitize_ean(ean_code));
                         }
@@ -101,6 +103,7 @@ pub async fn upload_receipt(
 
 pub async fn lookup_ean(
     State(state): State<Arc<AppState>>,
+    _user: AuthenticatedUser,
     Path(ean): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let clean_ean = util::sanitize_ean(&ean);
@@ -140,9 +143,10 @@ pub async fn lookup_ean(
 
 pub async fn finalize_receipt(
     State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
     Json(payload): Json<FinalizeReceiptPayload>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    crate::db::save_finalized_receipt(&state.user_db, &state.ean_db, payload)
+    crate::db::save_finalized_receipt(&state.user_db, &state.ean_db, payload, user.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -151,8 +155,9 @@ pub async fn finalize_receipt(
 
 pub async fn get_pantry_summary(
     State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let items = crate::db::fetch_pantry_summary(&state.user_db)
+    let items = crate::db::fetch_pantry_summary(&state.user_db, user.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -172,8 +177,9 @@ pub async fn get_pantry_summary(
 
 pub async fn get_pantry_items(
     State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let items = crate::db::fetch_pantry_items(&state.user_db)
+    let items = crate::db::fetch_pantry_items(&state.user_db, user.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -195,8 +201,9 @@ pub async fn get_pantry_items(
 
 pub async fn get_receipts_history(
     State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let receipts = crate::db::fetch_receipts_history(&state.user_db)
+    let receipts = crate::db::fetch_receipts_history(&state.user_db, user.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -219,9 +226,10 @@ pub async fn get_receipts_history(
 // FIXME: It would be better to load the receipt history into the frontend all at once rather than loading the details one by one each time the page is opened
 pub async fn get_receipt_details(
     State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
     Path(receipt_id): Path<i64>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let items = crate::db::fetch_receipt_details(&state.user_db, receipt_id)
+    let items = crate::db::fetch_receipt_details(&state.user_db, receipt_id, user.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -244,6 +252,7 @@ pub async fn get_receipt_details(
 
 pub async fn revalidate_articles(
     State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
     Json(payload): Json<RevalidateReceiptPayload>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let mut articles = payload.articles;
@@ -269,9 +278,10 @@ pub async fn revalidate_articles(
                 &state.user_db,
                 retailer,
                 &clean_name,
+                user.user_id,
             )
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
             if let Some(data) = matched_data {
                 article.name = data.name;

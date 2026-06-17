@@ -4,8 +4,10 @@ mod db;
 mod logger;
 mod ocr;
 mod util;
+mod auth;
 
 use axum::routing::get;
+use tower_http::services::ServeDir;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
@@ -88,6 +90,13 @@ async fn main() {
             "/api/receipts/{id}",
             get(api::handlers::get_receipt_details),
         )
+        .route("/api/health", get(|| async { "OK" }))
+        .route("/api/auth/register", post(api::auth_handlers::register))
+        .route("/api/auth/login", post(api::auth_handlers::login))
+        .route("/api/auth/me", get(api::auth_handlers::me))
+        .route("/api/auth/logout", post(api::auth_handlers::logout))
+        .route("/api/auth/upload-avatar", post(api::auth_handlers::upload_avatar))
+        .nest_service("/avatars", ServeDir::new("./storage/avatars"))
         .layer(cors)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(shared_state);
@@ -107,7 +116,7 @@ async fn main() {
 
     match axum_server::bind_rustls(addr, tls_config)
         .serve(app.into_make_service())
-        .await
+    .await
     {
         Ok(_) => {}
         Err(e) => {

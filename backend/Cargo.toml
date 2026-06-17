@@ -5,16 +5,20 @@ edition = "2024"
 
 [dependencies]
 axum = { version = "0.8.9", features = [ "multipart" ] }
-axum-server = { version = "0.8", features = [ "tls-rustls" ] }
-tokio = { version = "1.0", features = [ "full", "process" ] }
-tower-http = { version = "0.6.11", features = [ "cors" ] }
-serde = { version = "1.0", features = [ "derive" ] }
-serde_json = "1.0"
+axum-server = { version = "0.8.0", features = [ "tls-rustls" ] }
+axum-extra = { version = "0.12.6", features = [ "cookie" ] }
+tokio = { version = "1.52.3", features = [ "full", "process" ] }
+tower-http = { version = "0.7.0", features = [ "fs", "cors" ] }
+serde = { version = "1.0.228", features = [ "derive" ] }
+serde_json = "1.0.150"
 opencv = "0.98.2"
 reqwest = { version = "0.13.4", features = [ "json" ] }
-base64 = "0.22"
-anyhow = "1.0"
+base64 = "0.22.1"
+anyhow = "1.0.102"
 toml = "1.1.2"
-log = "0.4.30"
+log = "0.4.32"
 fern = { version = "0.7.1", features = [ "colored" ] }
-sqlx = { version = "0.8", features = [ "runtime-tokio", "sqlite" ] }
+sqlx = { version = "0.8.6", features = [ "runtime-tokio", "sqlite" ] }
+argon2 = { version = "0.5.3", features = [ "std" ] }
+jsonwebtoken = { version = "10.4.0", features = [ "rust_crypto" ] }
+rand_core = { version = "0.10.1" }

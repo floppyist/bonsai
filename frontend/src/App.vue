@@ -1,5 +1,5 @@
 <script setup>
-import { ref, provide } from 'vue'
+import { ref, provide, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBonsaiStore } from './stores/BonsaiStore.js'
 
@@ -24,6 +24,19 @@ let codeReaderInstance = null
 let codeReaderControls = null
 
 const isDevMode = ref(false)
+
+onMounted(async () => {
+  await store.checkBackendHealth()
+
+  if (store.isBackendConnected) {
+    await store.checkAuthStatus()
+
+    if (store.isAuthenticated) {
+      store.fetchPantryItems()
+      store.fetchReceiptsHistory()
+    }
+  }
+})
 
 provide('isDevMode', isDevMode)
 
