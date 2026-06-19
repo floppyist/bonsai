@@ -1,5 +1,7 @@
 use std::fs;
 
+use log::debug;
+
 use opencv::core::AlgorithmHint;
 use opencv::core::BORDER_CONSTANT;
 use opencv::core::BORDER_DEFAULT;
@@ -17,7 +19,6 @@ use opencv::prelude::*;
 
 use anyhow::Result;
 use base64::Engine;
-use log::debug;
 
 use crate::config::BonsaiOptions;
 

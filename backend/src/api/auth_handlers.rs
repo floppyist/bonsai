@@ -4,7 +4,11 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
 use axum::extract::Multipart;
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::extract::State;
+use axum::Json;
+use axum::response::IntoResponse;
+use axum::http::StatusCode;
+
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 
 use sqlx::Row;
@@ -44,7 +48,7 @@ pub async fn login(
         return (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response();
     }
 
-    let token = match generate_jwt(user.0) {
+    let token = match generate_jwt(user.0, &state.jwt_secret) {
         Ok(t) => t,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Token generation failed").into_response(),
     };

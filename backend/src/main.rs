@@ -6,12 +6,11 @@ mod ocr;
 mod util;
 mod auth;
 
-use axum::routing::get;
-use tower_http::services::ServeDir;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
 
+use axum::routing::get;
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::post;
@@ -22,6 +21,7 @@ use log::info;
 
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
+use tower_http::services::ServeDir;
 
 use sqlx::SqlitePool;
 
@@ -32,6 +32,7 @@ pub struct AppState {
     pub user_db: SqlitePool,
     pub ean_db: SqlitePool,
     pub http_client: reqwest::Client,
+    pub jwt_secret: Vec<u8>,
 }
 
 #[tokio::main]
@@ -54,11 +55,20 @@ async fn main() {
         }
     };
 
+    let jwt_secret= match std::env::var("BONSAI_JWT_SECRET") {
+        Ok(secret) => secret.into_bytes(),
+        Err(_) => {
+            error!("BONSAI_JWT_SECRET environment variable is not set! Abort.");
+            exit(1);
+        }
+    };
+
     let shared_state = Arc::new(AppState {
         config: options,
         user_db: pools.user_db,
         ean_db: pools.ean_db,
         http_client: reqwest::Client::new(),
+        jwt_secret,
     });
 
     let ip = shared_state.config.general.ip;

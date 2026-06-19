@@ -1,5 +1,6 @@
 use anyhow::Context;
 use anyhow::Result;
+
 use log::error;
 use log::info;
 
@@ -14,8 +15,8 @@ pub async fn run_vlm_analysis(
     b64_image: &str,
     config: &BonsaiOptions,
 ) -> Result<String> {
-    let model = &config.lvm.ollama_model;
-    let url = &config.lvm.ollama_url;
+    let model = &config.vlm.ollama_model;
+    let url = &config.vlm.ollama_url;
 
     info!("Forwarding request to Ollama model: '{}'...", model);
 
@@ -52,9 +53,9 @@ pub async fn run_vlm_analysis(
             },
         ],
         options: OllamaOptions {
-            temperature: config.lvm.temperature,
-            top_p: config.lvm.top_p,
-            num_thread: config.lvm.num_thread,
+            temperature: config.vlm.temperature,
+            top_p: config.vlm.top_p,
+            num_thread: config.vlm.num_thread,
         },
         format: "json".to_string(),
         stream: false,

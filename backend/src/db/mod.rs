@@ -1,6 +1,7 @@
 mod error;
 
 use log::{debug, error, info};
+
 use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Row, Sqlite, SqlitePool, migrate};

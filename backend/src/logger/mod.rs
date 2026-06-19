@@ -1,11 +1,12 @@
 use std::fs::File;
 use std::io;
 
+use log::LevelFilter;
+
 use fern::Dispatch;
 use fern::InitError;
 use fern::colors::Color;
 use fern::colors::ColoredLevelConfig;
-use log::LevelFilter;
 
 use crate::config::BonsaiOptions;
 

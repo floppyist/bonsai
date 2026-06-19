@@ -8,7 +8,7 @@ use serde::Serialize;
 pub struct BonsaiOptions {
     pub general: GeneralOptions,
     pub preprocessing: PreprocessingOptions,
-    pub lvm: LVMOptions,
+    pub vlm: VLMOptions,
     pub logging: LoggingOptions,
     pub database: DatabaseOptions,
     pub tls: TlsOptions,
@@ -26,7 +26,7 @@ pub struct PreprocessingOptions {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct LVMOptions {
+pub struct VLMOptions {
     pub ollama_model: String,
     pub ollama_url: String,
     pub temperature: f32,
@@ -68,7 +68,7 @@ impl Default for BonsaiOptions {
                 debug_dir: "target/debug_output".to_string(),
             },
 
-            lvm: LVMOptions {
+            vlm: VLMOptions {
                 ollama_model: "qwen2.5vl:3b".to_string(),
                 ollama_url: "http://localhost:11434/api/chat".to_string(),
                 temperature: 0.0,
