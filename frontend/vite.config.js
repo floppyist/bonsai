@@ -48,17 +48,17 @@ export default defineConfig({
       cert: fs.readFileSync(certPath),
     },
     hmr: {
-      host: 'bonsai.pi',
+      host: process.env.VITE_HOST || 'localhost',
       protocol: 'wss',
     },
     proxy: {
       '/api': {
-        target: 'https://bonsai.pi:3000',
+        target: process.env.VITE_API_TARGET || 'https://localhost:3000',
         changeOrigin: true,
         secure: false
       },
       '/avatars': {
-        target: 'https://bonsai.pi:3000',
+        target: process.env.VITE_API_TARGET || 'https://localhost:3000',
         changeOrigin: true,
         secure: false,
       }

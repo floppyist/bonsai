@@ -6,6 +6,7 @@ mod ocr;
 mod util;
 mod auth;
 
+use std::fs;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
@@ -19,6 +20,7 @@ use axum_server::tls_rustls::RustlsConfig;
 use log::error;
 use log::info;
 
+use tower_http::cors::AllowOrigin;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -38,6 +40,11 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     let options = BonsaiOptions::load();
+
+    // Setup basic paths
+    fs::create_dir_all("certs").ok();
+    fs::create_dir_all("db").ok();
+    fs::create_dir_all("storage/avatars").ok();
 
     let cert_path = options.tls.cert_path.clone();
     let key_path = options.tls.key_path.clone();
@@ -74,8 +81,16 @@ async fn main() {
     let ip = shared_state.config.general.ip;
     let port = shared_state.config.general.port;
 
+    let cors_origins = if shared_state.config.general.allowed_origins.contains(&"*".to_string()) {
+        AllowOrigin::any()
+    } else {
+        AllowOrigin::list(
+            shared_state.config.general.allowed_origins.iter().map(|o| o.parse().unwrap())
+        )
+    };
+
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(cors_origins)
         .allow_methods(Any)
         .allow_headers(Any);
 

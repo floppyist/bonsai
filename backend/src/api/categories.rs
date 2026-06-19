@@ -29,6 +29,8 @@ pub enum ProductCategory {
     DiyGarden,
     BooksMedia,
 
+    TobaccoAccessories,
+
     #[default]
     Uncategorized,
 }
@@ -55,6 +57,7 @@ impl fmt::Display for ProductCategory {
             ProductCategory::ClothingTextiles => "Kleidung & Textilien",
             ProductCategory::DiyGarden => "Baumarkt & Garten",
             ProductCategory::BooksMedia => "Medien & Freizeit",
+            ProductCategory::TobaccoAccessories => "Tabak & Zubehör",
             ProductCategory::Uncategorized => "Unkategorisiert",
         };
         write!(f, "{}", s)

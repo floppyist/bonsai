@@ -26,3 +26,4 @@ backend/config.toml
 certs/
 db/
 storage/
+.env

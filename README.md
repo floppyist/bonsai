@@ -7,12 +7,10 @@
 
 Smart receipt scanning, barcode tracking, pantry management, and budgeting — all running locally.
 
-
-
-<div style="display: flex; height: 100px; gap: 10px; width: 100%; margin-top: 20px; margin-bottom: 20px;">
-  <img style="flex: 1;" src="docs/screenshots/dashboard.png" width="220">
-  <img style="flex: 1;" src="docs/screenshots/scan.png" width="220">
-  <img style="flex: 1;" src="docs/screenshots/receipts.png" width="220">
+<div style="display: flex; flex-wrap: nowrap; gap: 10px; width: 100%; margin-top: 20px; margin-bottom: 20px; justify-content: center;">
+  <img style="flex: 1; min-width: 0; max-width: 33%; height: auto;" src="docs/screenshots/dashboard.png" alt="Dashboard">
+  <img style="flex: 1; min-width: 0; max-width: 33%; height: auto;" src="docs/screenshots/scan.png" alt="Scanner">
+  <img style="flex: 1; min-width: 0; max-width: 33%; height: auto;" src="docs/screenshots/receipts.png" alt="Receipts">
 </div>
 
 <p align="center">
@@ -55,34 +53,33 @@ Everything runs locally and can be self-hosted.
 * 💰 Household expense tracking
 * 📱 Installable Progressive Web App (PWA)
 * 🔒 Self-hosted and privacy-friendly
-* 🐳 Docker deployment support
+
+---
+
+## Architecture
+
+* **Frontend**: Vue 3, Vite, Pinia, Tailwind CSS 4, ZXing (barcode scanning)
+* **Backend**: Axum 0.8, sqlx (SQLite), OpenCV (image preprocessing), argon2 (password hashing), JWT (session tokens)
+* **Auth**: Registration and login via JWT stored in HTTP-only, secure, SameSite cookies
+* **Ollama**: Local VLM (`qwen2.5vl:3b`) extracts receipt data as structured JSON
 
 ---
 
 ## Table of Contents
 
 * [Installation](#installation)
-
   * [System Dependencies](#system-dependencies)
-  * [Backend Setup](#backend-setup)
-  * [Optional: Import OpenFoodFacts Data](#optional-import-openfoodfacts-data)
+  * [TLS Certificates](#tls-certificates)
   * [Ollama Setup](#ollama-setup)
-  * [Docker Deployment](#docker-deployment)
+* [Configuration](#configuration)
 * [Running Bonsai](#running-bonsai)
-
-  * [Backend](#backend)
-  * [Frontend](#frontend)
-* [Architecture](#architecture)
+* [Commands Reference](#commands-reference)
 
 ---
 
 # Installation
 
 ## System Dependencies
-
-### Void Linux
-
-Install the required compilers, libraries, and runtime dependencies:
 
 ```bash
 sudo xbps-install -y \
@@ -94,85 +91,37 @@ sudo xbps-install -y \
 ```
 
 > [!NOTE]
-> The Rust OpenCV bindings expect `libclang.so` to exist. On Void Linux you may need to create a symbolic link manually.
-
-List available libclang files:
-
-```bash
-ls /lib | grep libclang
-```
-
-Example output:
-
-```text
-libclang-cpp.so.21.1
-libclang.so.21.1
-libclang.so.21.1.7
-```
-
-Create the required symlink:
-
-```bash
-cd /lib
-sudo ln -s libclang.so.21.1.7 libclang.so
-```
-
-Adjust the version number to match your installed system.
+> The Rust OpenCV bindings expect `libclang.so` to exist. On Void Linux you may need to create a symbolic link manually:
+> ```bash
+> sudo ln -s /usr/lib/libclang.so.* /usr/lib/libclang.so
+> ```
 
 ---
 
-## Backend Setup
+## TLS Certificates
 
-Create the default directory structure:
-
-```bash
-mkdir -p backend/db
-mkdir -p backend/certs
-```
-
-### Generate Development Certificates
-
-Navigate to the certificates directory:
+Bonsai runs on HTTPS. Generate development certificates before starting:
 
 ```bash
 cd backend/certs
-```
 
-Create a local certificate authority:
-
-```bash
+# Certificate authority
 openssl genrsa -out devCA.key 4096
-
 openssl req -x509 -new -nodes \
-    -key devCA.key \
-    -sha256 \
-    -days 3650 \
+    -key devCA.key -sha256 -days 3650 \
     -subj "/CN=Dev-Root-CA/O=Development/C=DE" \
     -addext "basicConstraints=critical,CA:TRUE" \
     -addext "keyUsage=digitalSignature,keyCertSign,cRLSign" \
     -out devCA.pem
-```
 
-Create the server key and certificate request:
-
-```bash
+# Server key and certificate
 openssl genrsa -out server.key 2048
-
 openssl req -new \
     -key server.key \
-    -subj "/CN=bonsai.pi/O=Development/C=DE" \
+    -subj "/CN=localhost/O=Development/C=DE" \
     -out server.csr
-```
 
-Create the extension file:
-
-```bash
-touch server.ext
-```
-
-Insert the following content:
-
-```ini
+cat > server.ext <<EOF
 authorityKeyIdentifier=keyid,issuer
 basicConstraints=CA:FALSE
 keyUsage=digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
@@ -181,70 +130,17 @@ subjectAltName=@alt_names
 
 [alt_names]
 DNS.1=localhost
-DNS.2=your.domain
 IP.1=127.0.0.1
-IP.2=192.168.0.42
-```
+EOF
 
-Generate the server certificate:
-
-```bash
 openssl x509 -req \
-    -in server.csr \
-    -CA devCA.pem \
-    -CAkey devCA.key \
-    -CAcreateserial \
-    -out server.crt \
-    -days 397 \
-    -sha256 \
-    -extfile server.ext
+    -in server.csr -CA devCA.pem -CAkey devCA.key \
+    -CAcreateserial -out server.crt \
+    -days 397 -sha256 -extfile server.ext
 ```
 
----
-
-## Optional: Import OpenFoodFacts Data
-
-Generate the default databases:
-
-```bash
-cd backend
-cargo run
-```
-
-Place your OpenFoodFacts SQLite dump into:
-
-```text
-backend/db/off.db
-```
-
-Connect to the EAN database:
-
-```bash
-sqlite3 backend/db/ean.db
-```
-
-Import product data:
-
-```sql
-ATTACH DATABASE 'off.db' AS off;
-
-INSERT INTO ean_products (
-    ean,
-    name,
-    brand,
-    category,
-    nutrients
-)
-SELECT
-    ean,
-    name_de,
-    brand,
-    'UNCATEGORIZED',
-    nutrients
-FROM off.off_products;
-
-DETACH DATABASE off;
-```
+> [!TIP]
+> Add your local network IP or custom hostname under `[alt_names]` if you want to access Bonsai from other devices.
 
 ---
 
@@ -252,30 +148,57 @@ DETACH DATABASE off;
 
 Bonsai uses local Vision Language Models (VLMs) for receipt extraction.
 
-Install Ollama and start the service:
-
 ```bash
+# Install and start Ollama
 ollama serve
-```
 
-Download the recommended model:
-
-```bash
+# Download the recommended model (one-time)
 ollama run qwen2.5vl:3b
 ```
 
-> [!TIP]
-> The model only needs to be downloaded once.
-
 ---
 
-## Docker Deployment
+# Configuration
 
-If you prefer not to install OpenCV, Rust, Node.js, and Ollama manually, the complete stack can be deployed using Docker.
+### Backend
+
+The backend is configured via `backend/config.toml` (auto-generated with defaults if missing).
+
+Key settings:
+
+| Setting | Default | Description |
+|---|---|---|
+| `[general] ip` | `0.0.0.0` | Bind address |
+| `[general] port` | `3000` | HTTPS port |
+| `[general] allowed_origins` | `["*"]` | CORS allowed origins |
+| `[vlm] ollama_model` | `qwen2.5vl:3b` | VLM model for OCR |
+| `[vlm] ollama_url` | `http://localhost:11434/api/chat` | Ollama endpoint |
+| `[database] user_db_url` | `sqlite://db/user.db` | User database path |
+| `[database] ean_db_url` | `sqlite://db/ean.db` | Product database path |
+| `[tls] cert_path` | `certs/server.crt` | TLS certificate |
+| `[tls] key_path` | `certs/server.key` | TLS key |
+
+**Required environment variable:**
 
 ```bash
-cd docker
-docker compose up --build
+export BONSAI_JWT_SECRET="your-persistent-secret"
+```
+
+The backend will refuse to start without it. Generate one with `openssl rand -base64 32` and **keep it stable** — changing it invalidates all existing sessions.
+
+### Frontend
+
+The Vite dev server reads these optional environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_HOST` | `localhost` | Dev server hostname |
+| `VITE_API_TARGET` | `https://localhost:3000` | Backend proxy target |
+
+Set them in a `frontend/.env` file or pass them inline:
+
+```bash
+VITE_HOST=my-hostname VITE_API_TARGET=https://my-hostname:3000 npm run dev
 ```
 
 ---
@@ -284,46 +207,43 @@ docker compose up --build
 
 ## Backend
 
-Start the Axum backend:
-
 ```bash
 cd backend
-cargo run --release
+BONSAI_JWT_SECRET="your-persistent-secret" cargo run --release
 ```
 
----
+The server starts on `https://0.0.0.0:3000` (configurable in `config.toml`). Directories for `db/`, `certs/`, and `storage/` are created automatically.
 
 ## Frontend
-
-Install dependencies and launch the development server:
 
 ```bash
 cd frontend
 npm install
-npm run dev -- --host
+npm run dev
 ```
 
-The application will be available on your local network.
+The dev server is available at `https://localhost:5173`. It proxies `/api` and `/avatars` requests to the backend.
 
 ---
 
-# Architecture
+# Commands Reference
 
-```text
-┌─────────────────┐
-│   Vue.js PWA    │
-└────────┬────────┘
-         │ HTTPS
-         ▼
-┌─────────────────┐
-│   Axum Backend  │
-└───────┬─────────┘
-        │
-  ┌─────┴─────┐
-  ▼           ▼
-SQLite      Ollama
-(EAN DB)    (VLM OCR)
-```
+### Frontend (run from `frontend/`)
+
+| Command | Action |
+|---|---|
+| `npm run dev` | Start dev server (HTTPS, proxies to backend) |
+| `npm run build` | Production build to `dist/` |
+| `npm run lint` | Run oxlint → eslint (in order) |
+| `npm run format` | Format with Prettier (no semicolons, single quotes, 100 width) |
+
+### Backend (run from `backend/`)
+
+| Command | Action |
+|---|---|
+| `cargo run --release` | Start production server |
+| `cargo build` | Compile (debug) |
+| `cargo check` | Check compilation without building |
 
 ---
 

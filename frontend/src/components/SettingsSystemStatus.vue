@@ -6,6 +6,8 @@ const ollamaStatus = ref('Prüfe…')
 const ollamaColor = ref('text-zinc-400')
 const ollamaDot = ref('bg-zinc-400')
 
+const apiTarget = import.meta.env.VITE_API_TARGET || 'https://localhost:3000'
+
 onMounted(async () => {
   try {
     const res = await fetch('/api/health')
@@ -40,7 +42,9 @@ onMounted(async () => {
         </div>
         <div class="flex justify-between items-center">
           <span class="text-xs text-[#6B7C74]">Backend</span>
-          <span class="text-xs text-zinc-400 font-medium">bonsai.pi:3000 (Axum)</span>
+          <span v-if="isDevMode" class="text-xs text-zinc-400 font-medium">
+            {{ apiTarget }} (Axum)
+          </span>
         </div>
       </div>
     </div>

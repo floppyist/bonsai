@@ -23,13 +23,25 @@ pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<AuthPayload>,
 ) -> impl IntoResponse {
+    let username = payload.username.trim().to_string();
+
+    if username.len() < 3 || username.len() > 32 {
+        return (StatusCode::BAD_REQUEST, "Invalid username (3-32 characters)").into_response();
+    }
+    if payload.password.len() < 8 {
+        return (StatusCode::BAD_REQUEST, "Password too short (min 8 characters)").into_response();
+    }
+    if payload.password.len() > 128 {
+        return (StatusCode::BAD_REQUEST, "Password too long (max 128 characters)").into_response();
+    }
+
     let hashed_pw = match hash_password(&payload.password) {
         Ok(h) => h,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Registration failed").into_response(),
     };
 
-    if db::create_user(&state.user_db, &payload.username, &hashed_pw).await.is_err() {
-        return (StatusCode::CONFLICT, "User already exists or DB error").into_response();
+    if db::create_user(&state.user_db, &username, &hashed_pw).await.is_err() {
+        return (StatusCode::CONFLICT, "Registration failed").into_response();
     }
 
     StatusCode::CREATED.into_response()
@@ -70,7 +82,7 @@ pub async fn me(
     let row = sqlx::query("SELECT username, profile_picture_url FROM users WHERE id = ?")
         .bind(user.user_id)
         .fetch_optional(&state.user_db)
-        .await;
+    .await;
 
     match row {
         Ok(Some(r)) => {
@@ -117,9 +129,21 @@ pub async fn upload_avatar(
             let filepath = format!("./storage/avatars/{}", filename);
 
             let data = match field.bytes().await {
+                // Prevent too large image uploads
+                Ok(b) if b.len() > 2 * 1024 * 1024 => {
+                    return (StatusCode::PAYLOAD_TOO_LARGE, "Avatar image is too large (max 2 MB)").into_response();
+                },
                 Ok(b) => b,
                 Err(_) => return (StatusCode::BAD_REQUEST, "Failed to read image data").into_response(),
             };
+
+            // Validate image content via magic bytes (JPEG, PNG, WebP) for security reasons
+            if !data.starts_with(b"\xff\xd8\xff")
+            && !data.starts_with(b"\x89PNG")
+            && !data.starts_with(b"RIFF")
+            {
+                return (StatusCode::BAD_REQUEST, "Invalid image format").into_response();
+            }
 
             let mut file = match File::create(&filepath).await {
                 Ok(f) => f,
@@ -139,7 +163,7 @@ pub async fn upload_avatar(
                 .bind(&avatar_url)
                 .bind(user.user_id)
                 .execute(&state.user_db)
-                .await
+            .await
             {
                 log::error!("Failed to update avatar in DB: {}", e);
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Database update failed").into_response();

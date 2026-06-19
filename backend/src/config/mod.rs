@@ -18,6 +18,7 @@ pub struct BonsaiOptions {
 pub struct GeneralOptions {
     pub ip: IpAddr,
     pub port: u16,
+    pub allowed_origins: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -62,6 +63,7 @@ impl Default for BonsaiOptions {
             general: GeneralOptions {
                 ip: "0.0.0.0".parse().expect("Invalid default IP: 0.0.0.0"),
                 port: 3000,
+                allowed_origins: vec!["*".to_string()],
             },
 
             preprocessing: PreprocessingOptions {
