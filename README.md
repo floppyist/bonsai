@@ -7,11 +7,13 @@
 
 Smart receipt scanning, barcode tracking, pantry management, and budgeting — all running locally.
 
-<div style="display: flex; flex-wrap: nowrap; gap: 10px; width: 100%; margin-top: 20px; margin-bottom: 20px; justify-content: center;">
-  <img style="flex: 1; min-width: 0; max-width: 33%; height: auto;" src="docs/screenshots/dashboard.png" alt="Dashboard">
-  <img style="flex: 1; min-width: 0; max-width: 33%; height: auto;" src="docs/screenshots/scan.png" alt="Scanner">
-  <img style="flex: 1; min-width: 0; max-width: 33%; height: auto;" src="docs/screenshots/receipts.png" alt="Receipts">
-</div>
+<table>
+  <tr>
+    <td><img src="docs/screenshots/dashboard.png" alt="Dashboard"></td>
+    <td><img src="docs/screenshots/scan.png" alt="Scanner"></td>
+    <td><img src="docs/screenshots/receipts.png" alt="Receipts"></td>
+  </tr>
+</table>
 
 <p align="center">
   Dashboard • Scanner • Receipts
