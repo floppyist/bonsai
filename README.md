@@ -51,7 +51,7 @@ Everything runs locally and can be self-hosted.
 * 📄 Receipt scanning using local Vision Language Models (VLMs)
 * 📦 Automatic pantry management
 * 🔍 EAN barcode scanning and lookup
-* 🥗 Nutritional information support
+* 🥗 ~~Nutritional information support~~ (WIP)
 * 💰 Household expense tracking
 * 📱 Installable Progressive Web App (PWA)
 * 🔒 Self-hosted and privacy-friendly
